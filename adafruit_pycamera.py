@@ -3,7 +3,9 @@ import sys
 import time
 import struct
 import board
+import keypad
 from digitalio import DigitalInOut, Direction, Pull
+from adafruit_debouncer import Debouncer
 import microcontroller
 import busio
 import adafruit_lis3dh
@@ -47,10 +49,10 @@ class PyCamera:
     def __init__(self) -> None:
         self._i2c = board.I2C()
 
-        self._i2c.try_lock()
-        print("I2C addr found:",
-              [hex(device_address) for device_address in self._i2c.scan()])
-        self._i2c.unlock()
+        #self._i2c.try_lock()
+        #print("I2C addr found:",
+        #      [hex(device_address) for device_address in self._i2c.scan()])
+        #self._i2c.unlock()
 
         self._spi = board.SPI()
         # construct displayio by hand
@@ -66,6 +68,7 @@ class PyCamera:
 
         # seesaw GPIO expander
         self._ss = Seesaw(self._i2c, 0x44)
+        
         # lis3dh accelerometer
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
         self.accel.range = adafruit_lis3dh.RANGE_2_G
@@ -106,15 +109,39 @@ class PyCamera:
         self.camera.saturation = 3
 
         # action!
-        self.shutter = DigitalInOut(microcontroller.pin.GPIO0)
-        self.shutter.direction = Direction.INPUT
-        self.shutter.pull = Pull.UP
-        self.carddetect = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
-        self.carddetect.direction = Direction.INPUT
-        self.carddetect.pull = Pull.UP
+        carddet = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
+        carddet.switch_to_input(Pull.UP)
+        self.card_detect = Debouncer(carddet)
         self._card_cs = DigitalInOut(board.CARD_CS)
         self.sdcard = None
+        try:
+            self.mount_sd_card()
+        except RuntimeError:
+            pass # no card found, its ok!
+
+        shut = DigitalInOut(microcontroller.pin.GPIO0)
+        shut.switch_to_input(Pull.UP)
+        self.shutter = Debouncer(shut)
+
         self._bitmap = None
+
+    def mount_sd_card(self):
+        if not self.card_detect.value:
+            raise RuntimeError("SD card detection failed")
+        self.sdcard = adafruit_sdcard.SDCard(self._spi, self._card_cs)
+        vfs = storage.VfsFat(self.sdcard)
+        storage.mount(vfs, "/sd")
+        print(os.listdir("/sd"))
+
+    def unmount_sd_card(self):
+        try:
+            storage.umount("/sd")
+        except OSError:
+            pass
+
+    def keys_debounce(self):
+        self.card_detect.update()
+        self.shutter.update()
 
     def capture_and_blit(self):
         if not self._bitmap:
