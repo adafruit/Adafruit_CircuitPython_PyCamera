@@ -48,26 +48,25 @@ class PyCamera:
 
     def __init__(self) -> None:
         self._i2c = board.I2C()
-
-        #self._i2c.try_lock()
-        #print("I2C addr found:",
-        #      [hex(device_address) for device_address in self._i2c.scan()])
-        #self._i2c.unlock()
-
         self._spi = board.SPI()
-        # construct displayio by hand
-        displayio.release_displays()
-        self._display_bus = displayio.FourWire(self._spi, command=board.TFT_DC,
-                                               chip_select=board.TFT_CS,
-                                               reset=board.TFT_RESET,
-                                               baudrate=60_000_000)
-        self.display = board.DISPLAY
-        # init specially since we are going to write directly below
-        self.display = displayio.Display(self._display_bus, self._INIT_SEQUENCE,
-                                         width=240, height=240, colstart=80)
+        self.deinit_display()
 
         # seesaw GPIO expander
         self._ss = Seesaw(self._i2c, 0x44)
+
+        carddet = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
+        carddet.switch_to_input(Pull.UP)
+        self.card_detect = Debouncer(carddet)
+        self._card_cs = DigitalInOut(board.CARD_CS)
+        self._card_cs.switch_to_input(Pull.UP)
+        self._card_power = DigitalInOut(microcontroller.pin.GPIO1)
+        self._card_power.switch_to_output(True)
+        
+        self.sdcard = None
+        try:
+            self.mount_sd_card()
+        except RuntimeError:
+            pass # no card found, its ok!
         
         # lis3dh accelerometer
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
@@ -79,7 +78,8 @@ class PyCamera:
         led.switch_to_output(False)
         # built in neopixels
         neopixels = neopixel.NeoPixel(board.NEOPIXEL, 4, brightness=0.1)
-
+        neopixels.fill(0)
+        
         # camera!
         self._cam_pwdn = ss_dio.DigitalIO(self._ss, _SS_CAMPWDN)
         self._cam_pwdn.switch_to_output(True)
@@ -109,29 +109,62 @@ class PyCamera:
         self.camera.saturation = 3
 
         # action!
-        carddet = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
-        carddet.switch_to_input(Pull.UP)
-        self.card_detect = Debouncer(carddet)
-        self._card_cs = DigitalInOut(board.CARD_CS)
-        self.sdcard = None
-        try:
-            self.mount_sd_card()
-        except RuntimeError:
-            pass # no card found, its ok!
 
+        self.init_display()
+        
         shut = DigitalInOut(microcontroller.pin.GPIO0)
         shut.switch_to_input(Pull.UP)
         self.shutter = Debouncer(shut)
 
         self._bitmap = None
 
+    def init_display(self):
+        # construct displayio by hand
+        displayio.release_displays()        
+        self._display_bus = displayio.FourWire(self._spi, command=board.TFT_DC,
+                                               chip_select=board.TFT_CS,
+                                               reset=board.TFT_RESET,
+                                               baudrate=60_000_000)
+        self.display = board.DISPLAY
+        # init specially since we are going to write directly below
+        self.display = displayio.Display(self._display_bus, self._INIT_SEQUENCE,
+                                         width=240, height=240, colstart=80)
+
+    def deinit_display(self):
+        # construct displayio by hand
+        displayio.release_displays()
+        self._display_bus = None
+        self.display = None
+
     def mount_sd_card(self):
         if not self.card_detect.value:
             raise RuntimeError("SD card detection failed")
+        # depower SD card
+        self._card_power.value = True
+        self._card_cs.switch_to_output(False)
+        # deinit display and SPI
+        self.deinit_display()
+        self._spi.deinit()
+        sckpin = DigitalInOut(board.TFT_SCK)
+        sckpin.switch_to_output(False)
+        mosipin = DigitalInOut(board.TFT_MOSI)
+        mosipin.switch_to_output(False)
+        misopin = DigitalInOut(microcontroller.pin.GPIO37)
+        misopin.switch_to_output(False)
+        time.sleep(0.05)
+        self._card_cs.switch_to_input(Pull.UP)
+        sckpin.deinit()
+        mosipin.deinit()
+        misopin.deinit()
+        self._spi = board.SPI()
+        # power SD card
+        self._card_power.value = False
         self.sdcard = adafruit_sdcard.SDCard(self._spi, self._card_cs)
         vfs = storage.VfsFat(self.sdcard)
         storage.mount(vfs, "/sd")
+        self.init_display()
         print(os.listdir("/sd"))
+        
 
     def unmount_sd_card(self):
         try:
