@@ -18,7 +18,8 @@ import storage
 import displayio
 import adafruit_ov5640
 from adafruit_st7789 import ST7789
-
+import terminalio
+from adafruit_display_text import label
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
@@ -103,19 +104,18 @@ class PyCamera:
         print("Found camera ID %04x" % self.camera.chip_id)
         self.camera.flip_x = True
         self.camera.flip_y = False
-        self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_RGB
         #self.camera.test_pattern = True
         self.camera.effect = adafruit_ov5640.OV5640_SPECIAL_EFFECT_NONE
         self.camera.saturation = 3
 
         # action!
-
         self.init_display()
         
         shut = DigitalInOut(microcontroller.pin.GPIO0)
         shut.switch_to_input(Pull.UP)
         self.shutter = Debouncer(shut)
 
+        self._bigbuf = None
         self._bitmap = None
 
     def init_display(self):
@@ -135,6 +135,15 @@ class PyCamera:
         displayio.release_displays()
         self._display_bus = None
         self.display = None
+
+    def display_message(self, message, color=0xFF0000):
+        text_area = label.Label(terminalio.FONT, text=message, color=color, scale=3)
+        text_area.anchor_point = (0.5, 0.5)
+        text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
+        
+        # Show it
+        self.display.show(text_area)
+        self.display.refresh()
 
     def mount_sd_card(self):
         if not self.card_detect.value:
@@ -163,7 +172,7 @@ class PyCamera:
         vfs = storage.VfsFat(self.sdcard)
         storage.mount(vfs, "/sd")
         self.init_display()
-        print(os.listdir("/sd"))
+        self._image_counter = 0
         
 
     def unmount_sd_card(self):
@@ -176,17 +185,48 @@ class PyCamera:
         self.card_detect.update()
         self.shutter.update()
 
-    def capture_and_blit(self):
+    def live_preview_mode(self):
+        self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_RGB
+        self.camera.size = adafruit_ov5640.OV5640_SIZE_240X240
         if not self._bitmap:
             self._bitmap = displayio.Bitmap(self.camera.width,
                                             self.camera.height, 65536)
         # setup the window to be the full screen
         self.display.auto_refresh = False
+
+    def open_next_image(self):
+        while True:
+            filename = "/sd/img%04d.jpg" % self._image_counter
+            self._image_counter += 1
+            try:
+                os.stat(filename)
+            except OSError:
+                break
+        print("Writing to", filename)
+        return open(filename, "wb")
+
+    def capture_jpeg(self, size=adafruit_ov5640.OV5640_SIZE_VGA):
+        try:
+            os.stat("/sd")
+        except OSError:            # no SD card!
+            raise RuntimeError("No SD card mounted")
+        self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_JPEG
+        self.camera.size = size
+        self.camera.quality = 7
+        b = bytearray(self.camera.capture_buffer_size)
+        jpeg = self.camera.capture(b)
+        print("Captured %d bytes of jpeg data (had allocated %d bytes" % (len(jpeg), self.camera.capture_buffer_size))
+        print("Resolution %d x %d" % (self.camera.width, self.camera.height))
+
+        with self.open_next_image() as f:
+            f.write(jpeg)
+        print("# Wrote image")
+            
+    def capture_and_blit(self):
         self._display_bus.send(42, struct.pack(">hh", 80,
                                                80 + self._bitmap.width - 1))
         self._display_bus.send(43, struct.pack(">hh", 0,
                                                self._bitmap.height - 1))
-
         t = time.monotonic()
         self.camera.capture(self._bitmap)
         capture_time = time.monotonic()-t
