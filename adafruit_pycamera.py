@@ -48,13 +48,16 @@ class PyCamera:
 
 
     def __init__(self) -> None:
+        t = time.monotonic()
         self._i2c = board.I2C()
         self._spi = board.SPI()
         self.deinit_display()
 
         # seesaw GPIO expander
-        self._ss = Seesaw(self._i2c, 0x44)
-
+        print("seesaw start @", time.monotonic()-t)
+        self._ss = Seesaw(self._i2c, 0x44, reset=False)
+        self._ss.sw_reset(0.01)
+        print("seesaw done @", time.monotonic()-t)
         carddet = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
         carddet.switch_to_input(Pull.UP)
         self.card_detect = Debouncer(carddet)
@@ -68,6 +71,7 @@ class PyCamera:
             self.mount_sd_card()
         except RuntimeError:
             pass # no card found, its ok!
+        print("sdcard done @", time.monotonic()-t)
         
         # lis3dh accelerometer
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
@@ -87,6 +91,8 @@ class PyCamera:
         self._cam_reset = ss_dio.DigitalIO(self._ss, _SS_CAMRST)
         self._cam_reset.switch_to_output(False)
 
+        print("pre cam @", time.monotonic()-t)
+
         self.camera = adafruit_ov5640.OV5640(
             self._i2c,
             data_pins=(board.CAMERA_DATA2, board.CAMERA_DATA3, board.CAMERA_DATA4,
@@ -102,6 +108,7 @@ class PyCamera:
             reset=self._cam_reset
             )
         print("Found camera ID %04x" % self.camera.chip_id)
+        print("card done @", time.monotonic()-t)
         self.camera.flip_x = True
         self.camera.flip_y = False
         #self.camera.test_pattern = True
