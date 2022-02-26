@@ -25,12 +25,12 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
 
 from micropython import const
 
-SNAPSHOT_MODE = 0
-
 class PyCamera:
-    resolutions = (None, "160x120", "176x144", "240x176", "240x240", "320x240", "400x296", "480x320", "640x480",
-                   "800x600", "1024x768", "1280x720", "1280x1024", "1600x1200", "2560x1440",
-                   "2560x1600", "1088x1920", "2560x1920")
+    resolutions = ("160x120", "176x144", "240x176", "240x240", "320x240", "400x296",
+                   "480x320", "640x480", "800x600", "1024x768", "1280x720", "1280x1024",
+                   "1600x1200", "2560x1440", "2560x1600", "1088x1920", "2560x1920")
+
+    effects = ("Normal", "Negative", "Grayscale", "Reddish", "Greenish", "Bluish", "Sepia")
     
     _SS_DOWN = const(16) # PC4
     _SS_LEFT =  const(2) # PA6
@@ -60,6 +60,7 @@ class PyCamera:
 
         self.splash = displayio.Group()
         self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
+        self._effect_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=4, y=10, scale=2)
 
         # seesaw GPIO expander
         self._ss = Seesaw(self._i2c, 0x44, reset=False)
@@ -115,7 +116,7 @@ class PyCamera:
         self.camera.flip_x = True
         self.camera.flip_y = False
         #self.camera.test_pattern = True
-        self.camera.effect = adafruit_ov5640.OV5640_SPECIAL_EFFECT_NONE
+        self.effect = adafruit_ov5640.OV5640_SPECIAL_EFFECT_NONE
         self.camera.saturation = 3
 
         # action!
@@ -148,8 +149,7 @@ class PyCamera:
         self._topbar.append(self._sd_label)
 
         self._botbar = displayio.Group(x=0, y=210)
-        self._mode_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2)
-        self._botbar.append(self._mode_label)
+        self._botbar.append(self._effect_label)
 
         self.splash.append(self._topbar)
         self.splash.append(self._botbar)
@@ -158,20 +158,48 @@ class PyCamera:
         
         print("init done @", time.monotonic()-self.t)
 
-    def set_mode(self, mode):
-        if mode == SNAPSHOT_MODE:
-            self._mode_label.text = "JPEG Camera"
-        self.display.refresh()
-                      
-    def set_resolution(self, res):
-        if not res in self.resolutions:
-            raise RuntimeError("Invalid resolution")
-        self._resolution = self.resolutions.index(res)
-        self._res_label.text = res
+    def select_setting(self, setting_name):
+        self._effect_label.color = 0xFFFFFF
+        self._effect_label.background_color = 0x0
+        self._res_label.color = 0xFFFFFF
+        self._res_label.background_color = 0x0
+        if setting_name == "effect":
+            self._effect_label.color = 0x0
+            self._effect_label.background_color = 0xFFFFFF
+        if setting_name == "resolution":
+            self._res_label.color = 0x0
+            self._res_label.background_color = 0xFFFFFF
+
         self.display.refresh()
 
-    def get_resolution(self):
+    @property
+    def effect(self):
+        return self._effect
+    
+    @effect.setter
+    def effect(self, setting):
+        setting = (setting + len(self.effects)) % len(self.effects)
+        self._effect = setting
+        self._effect_label.text = self.effects[setting]
+        self.camera.effect = setting
+        self.display.refresh()
+
+    @property
+    def resolution(self):
         return self._resolution
+
+    @resolution.setter
+    def resolution(self, res):
+        if isinstance(res, str):
+            if not res in self.resolutions:
+                raise RuntimeError("Invalid Resolution")
+            res = self.resolutions.index(res)
+        if isinstance(res, int):
+            res = (res + len(self.resolutions)) % len(self.resolutions)
+            self._resolution = res
+            self._res_label.text = self.resolutions[res]
+        self.display.refresh()
+
 
     def init_display(self):
         # construct displayio by hand
@@ -266,6 +294,7 @@ class PyCamera:
         self.camera._write_list(adafruit_ov5640._sensor_default_regs)
         self.camera.size = adafruit_ov5640.OV5640_SIZE_HQVGA 
         self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_RGB
+        self.effect = self._effect
 
     def open_next_image(self):
         while True:
@@ -284,7 +313,7 @@ class PyCamera:
         except OSError:            # no SD card!
             raise RuntimeError("No SD card mounted")
         self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_JPEG
-        self.camera.size = self._resolution
+        self.camera.size = self._resolution + 1  # starts at 1 not 0
         self.camera.quality = 4
         b = bytearray(self.camera.capture_buffer_size)
         jpeg = self.camera.capture(b)
