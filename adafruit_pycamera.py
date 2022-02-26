@@ -6,14 +6,13 @@ import board
 import keypad
 from digitalio import DigitalInOut, Direction, Pull
 from adafruit_debouncer import Debouncer
-import microcontroller
 import busio
 import adafruit_lis3dh
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_seesaw.digitalio as ss_dio
 import neopixel
 from rainbowio import colorwheel
-import adafruit_sdcard
+import sdcardio
 import storage
 import displayio
 import adafruit_ov5640
@@ -26,44 +25,50 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
 
 from micropython import const
 
+SNAPSHOT_MODE = 0
+
 class PyCamera:
-    _SS_BUTTONA = const(16) # PC4
-    _SS_BUTTONB =  const(2) # PA6
-    _SS_BUTTONC =  const(3) # PA7
-    _SS_BUTTOND =   const(6) # PB5
+    resolutions = (None, "160x120", "176x144", "240x176", "240x240", "320x240", "400x296", "480x320", "640x480",
+                   "800x600", "1024x768", "1280x720", "1280x1024", "1600x1200", "2560x1440",
+                   "2560x1600", "1088x1920", "2560x1920")
+    
+    _SS_DOWN = const(16) # PC4
+    _SS_LEFT =  const(2) # PA6
+    _SS_UP =  const(3) # PA7
+    _SS_RIGHT =   const(6) # PB5
     _SS_BATTMON =  const(18) # PA1
     _SS_CAMRST  =  const(19) # PA2
     _SS_CAMPWDN =  const(20) # PA3
     _SS_CARDDET =   const(4) # PB7
 
     _INIT_SEQUENCE = (
-        b"\x01\x80\x96"  # _SWRESET and Delay 150ms
-        b"\x11\x80\xFF"  # _SLPOUT and Delay 500ms
-        b"\x3A\x81\x55\x0A"  # _COLMOD and Delay 10ms
-        b"\x21\x80\x0A"  # _INVON Hack and Delay 10ms
-        b"\x13\x80\x0A"  # _NORON and Delay 10ms
+        b"\x01\x80\x78"  # _SWRESET and Delay 120ms
+        b"\x11\x80\x05"  # _SLPOUT and Delay 5ms
+        b"\x3A\x01\x55"  # _COLMOD
+        b"\x21\x00"      # _INVON Hack
+        b"\x13\x00"      # _NORON
         b"\x36\x01\xA0"  # _MADCTL
-        b"\x29\x80\xFF"  # _DISPON and Delay 500ms
+        b"\x29\x80\x05"  # _DISPON and Delay 5ms
         )
 
 
     def __init__(self) -> None:
-        t = time.monotonic()
+        self.t = time.monotonic()
         self._i2c = board.I2C()
         self._spi = board.SPI()
         self.deinit_display()
 
+        self.splash = displayio.Group()
+        self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
+
         # seesaw GPIO expander
-        print("seesaw start @", time.monotonic()-t)
         self._ss = Seesaw(self._i2c, 0x44, reset=False)
         self._ss.sw_reset(0.01)
-        print("seesaw done @", time.monotonic()-t)
+        print("seesaw done @", time.monotonic()-self.t)
         carddet = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
         carddet.switch_to_input(Pull.UP)
         self.card_detect = Debouncer(carddet)
-        self._card_cs = DigitalInOut(board.CARD_CS)
-        self._card_cs.switch_to_input(Pull.UP)
-        self._card_power = DigitalInOut(microcontroller.pin.GPIO1)
+        self._card_power = DigitalInOut(board.CARD_POWER)
         self._card_power.switch_to_output(True)
         
         self.sdcard = None
@@ -71,7 +76,7 @@ class PyCamera:
             self.mount_sd_card()
         except RuntimeError:
             pass # no card found, its ok!
-        print("sdcard done @", time.monotonic()-t)
+        print("sdcard done @", time.monotonic()-self.t)
         
         # lis3dh accelerometer
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
@@ -91,24 +96,22 @@ class PyCamera:
         self._cam_reset = ss_dio.DigitalIO(self._ss, _SS_CAMRST)
         self._cam_reset.switch_to_output(False)
 
-        print("pre cam @", time.monotonic()-t)
+        print("pre cam @", time.monotonic()-self.t)
 
         self.camera = adafruit_ov5640.OV5640(
             self._i2c,
-            data_pins=(board.CAMERA_DATA2, board.CAMERA_DATA3, board.CAMERA_DATA4,
-                       board.CAMERA_DATA5, board.CAMERA_DATA6, board.CAMERA_DATA7,
-                       board.CAMERA_DATA8, board.CAMERA_DATA9),
+            data_pins=board.CAMERA_DATA,
             clock=board.CAMERA_PCLK,
             vsync=board.CAMERA_VSYNC,
             href=board.CAMERA_HREF,
             mclk=board.CAMERA_XCLK,
             mclk_frequency=20_000_000,
-            size=adafruit_ov5640.OV5640_SIZE_240X240,
+            size=adafruit_ov5640.OV5640_SIZE_HQVGA,
             shutdown=self._cam_pwdn,
             reset=self._cam_reset
             )
         print("Found camera ID %04x" % self.camera.chip_id)
-        print("card done @", time.monotonic()-t)
+        print("camera done @", time.monotonic()-self.t)
         self.camera.flip_x = True
         self.camera.flip_y = False
         #self.camera.test_pattern = True
@@ -116,14 +119,59 @@ class PyCamera:
         self.camera.saturation = 3
 
         # action!
-        self.init_display()
+        if not self.display:
+            self.init_display()
         
-        shut = DigitalInOut(microcontroller.pin.GPIO0)
+        shut = DigitalInOut(board.BUTTON)
         shut.switch_to_input(Pull.UP)
         self.shutter = Debouncer(shut)
 
+        up = ss_dio.DigitalIO(self._ss, _SS_UP)
+        up.switch_to_input(Pull.UP)
+        self.up = Debouncer(up)
+        down = ss_dio.DigitalIO(self._ss, _SS_DOWN)
+        down.switch_to_input(Pull.UP)
+        self.down = Debouncer(down)
+        left = ss_dio.DigitalIO(self._ss, _SS_LEFT)
+        left.switch_to_input(Pull.UP)
+        self.left = Debouncer(left)
+        right = ss_dio.DigitalIO(self._ss, _SS_RIGHT)
+        right.switch_to_input(Pull.UP)
+        self.right = Debouncer(right)
+
         self._bigbuf = None
-        self._bitmap = None
+        self._bitmap = displayio.Bitmap(240, 176, 65536)
+
+        self._topbar = displayio.Group()
+        self._res_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2)
+        self._topbar.append(self._res_label)
+        self._topbar.append(self._sd_label)
+
+        self._botbar = displayio.Group(x=0, y=210)
+        self._mode_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2)
+        self._botbar.append(self._mode_label)
+
+        self.splash.append(self._topbar)
+        self.splash.append(self._botbar)
+        self.display.show(self.splash)
+        self.display.refresh()
+        
+        print("init done @", time.monotonic()-self.t)
+
+    def set_mode(self, mode):
+        if mode == SNAPSHOT_MODE:
+            self._mode_label.text = "JPEG Camera"
+        self.display.refresh()
+                      
+    def set_resolution(self, res):
+        if not res in self.resolutions:
+            raise RuntimeError("Invalid resolution")
+        self._resolution = self.resolutions.index(res)
+        self._res_label.text = res
+        self.display.refresh()
+
+    def get_resolution(self):
+        return self._resolution
 
     def init_display(self):
         # construct displayio by hand
@@ -135,8 +183,11 @@ class PyCamera:
         self.display = board.DISPLAY
         # init specially since we are going to write directly below
         self.display = displayio.Display(self._display_bus, self._INIT_SEQUENCE,
-                                         width=240, height=240, colstart=80)
-
+                                         width=240, height=240, colstart=80,
+                                         auto_refresh=False)
+        self.display.show(self.splash)
+        self.display.refresh()
+        
     def deinit_display(self):
         # construct displayio by hand
         displayio.release_displays()
@@ -149,37 +200,49 @@ class PyCamera:
         text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
         
         # Show it
-        self.display.show(text_area)
+        self.splash.append(text_area)
         self.display.refresh()
+        self.splash.pop()
 
     def mount_sd_card(self):
+        self._sd_label.text = "NO SD"
+        self._sd_label.color = 0xFF0000
         if not self.card_detect.value:
             raise RuntimeError("SD card detection failed")
+        if self.sdcard:
+            self.sdcard.deinit()
         # depower SD card
         self._card_power.value = True
-        self._card_cs.switch_to_output(False)
+        card_cs = DigitalInOut(board.CARD_CS)
+        card_cs.switch_to_output(False)
         # deinit display and SPI
         self.deinit_display()
         self._spi.deinit()
-        sckpin = DigitalInOut(board.TFT_SCK)
+        sckpin = DigitalInOut(board.SCK)
         sckpin.switch_to_output(False)
-        mosipin = DigitalInOut(board.TFT_MOSI)
+        mosipin = DigitalInOut(board.MOSI)
         mosipin.switch_to_output(False)
-        misopin = DigitalInOut(microcontroller.pin.GPIO37)
+        misopin = DigitalInOut(board.MISO)
         misopin.switch_to_output(False)
+
         time.sleep(0.05)
-        self._card_cs.switch_to_input(Pull.UP)
+
         sckpin.deinit()
         mosipin.deinit()
         misopin.deinit()
         self._spi = board.SPI()
         # power SD card
         self._card_power.value = False
-        self.sdcard = adafruit_sdcard.SDCard(self._spi, self._card_cs)
+        card_cs.deinit()
+        print("sdcard init @", time.monotonic()-self.t)
+        self.sdcard = sdcardio.SDCard(self._spi, board.CARD_CS, baudrate=60000000)
         vfs = storage.VfsFat(self.sdcard)
+        print("mount vfs @", time.monotonic()-self.t)
         storage.mount(vfs, "/sd")
         self.init_display()
         self._image_counter = 0
+        self._sd_label.text = "SD OK"
+        self._sd_label.color = 0x00FF00
         
 
     def unmount_sd_card(self):
@@ -187,19 +250,22 @@ class PyCamera:
             storage.umount("/sd")
         except OSError:
             pass
+        self._sd_label.text = "NO SD"
+        self._sd_label.color = 0xFF0000
+
 
     def keys_debounce(self):
         self.card_detect.update()
         self.shutter.update()
+        self.up.update()
+        self.down.update()
+        self.left.update()
+        self.right.update()
 
     def live_preview_mode(self):
+        self.camera._write_list(adafruit_ov5640._sensor_default_regs)
+        self.camera.size = adafruit_ov5640.OV5640_SIZE_HQVGA 
         self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_RGB
-        self.camera.size = adafruit_ov5640.OV5640_SIZE_240X240
-        if not self._bitmap:
-            self._bitmap = displayio.Bitmap(self.camera.width,
-                                            self.camera.height, 65536)
-        # setup the window to be the full screen
-        self.display.auto_refresh = False
 
     def open_next_image(self):
         while True:
@@ -212,14 +278,14 @@ class PyCamera:
         print("Writing to", filename)
         return open(filename, "wb")
 
-    def capture_jpeg(self, size=adafruit_ov5640.OV5640_SIZE_VGA):
+    def capture_jpeg(self):
         try:
             os.stat("/sd")
         except OSError:            # no SD card!
             raise RuntimeError("No SD card mounted")
         self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_JPEG
-        self.camera.size = size
-        self.camera.quality = 7
+        self.camera.size = self._resolution
+        self.camera.quality = 4
         b = bytearray(self.camera.capture_buffer_size)
         jpeg = self.camera.capture(b)
         print("Captured %d bytes of jpeg data (had allocated %d bytes" % (len(jpeg), self.camera.capture_buffer_size))
@@ -232,8 +298,8 @@ class PyCamera:
     def capture_and_blit(self):
         self._display_bus.send(42, struct.pack(">hh", 80,
                                                80 + self._bitmap.width - 1))
-        self._display_bus.send(43, struct.pack(">hh", 0,
-                                               self._bitmap.height - 1))
+        self._display_bus.send(43, struct.pack(">hh", 32,
+                                               32 + self._bitmap.height - 1))
         t = time.monotonic()
         self.camera.capture(self._bitmap)
         capture_time = time.monotonic()-t
