@@ -8,39 +8,59 @@ from digitalio import DigitalInOut, Direction, Pull
 from adafruit_debouncer import Debouncer
 import busio
 import adafruit_lis3dh
-from adafruit_seesaw.seesaw import Seesaw
-import adafruit_seesaw.digitalio as ss_dio
 import neopixel
 from rainbowio import colorwheel
 import sdcardio
 import storage
 import displayio
-import adafruit_ov5640
+#import adafruit_ov5640
+import espcamera
 from adafruit_st7789 import ST7789
 import terminalio
 from adafruit_display_text import label
+import pwmio
+import microcontroller
+import adafruit_aw9523
+import espidf
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
 
 from micropython import const
 
+
+
 class PyCamera:
     resolutions = ("160x120", "176x144", "240x176", "240x240", "320x240", "400x296",
                    "480x320", "640x480", "800x600", "1024x768", "1280x720", "1280x1024",
                    "1600x1200", "2560x1440", "2560x1600", "1088x1920", "2560x1920")
 
-    effects = ("Normal", "Negative", "Grayscale", "Reddish", "Greenish", "Bluish", "Sepia")
+    effects = ("Normal", "Negative", "Grayscale", "Reddish", "Greenish", "Bluish", "Sepia", "Overexp", "Solarize")
+    modes = ("JPEG", "GIF", "STOP")
     
-    _SS_DOWN = const(16) # PC4
-    _SS_LEFT =  const(2) # PA6
-    _SS_UP =  const(3) # PA7
-    _SS_RIGHT =   const(6) # PB5
-    _SS_BATTMON =  const(18) # PA1
-    _SS_CAMRST  =  const(19) # PA2
-    _SS_CAMPWDN =  const(20) # PA3
-    _SS_CARDDET =   const(4) # PB7
+    _AW_DOWN = const(15)
+    _AW_LEFT =  const(14)
+    _AW_UP =  const(13)
+    _AW_RIGHT =   const(12)
+    _AW_OK =   const(11)
+    _AW_SELECT =   const(1)
+    _AW_BACKLIGHT =   const(2)
+    _AW_CARDDET =   const(8)
+    _AW_MUTE =   const(0)
+    _AW_SDPWR =   const(9)
+    #_SS_ALL_BUTTONS_MASK = const(0b000010000000001011100)
+    #_SS_DOWN_MASK = const(0x10000)
+    #_SS_LEFT_MASK = const(0x00004)
+    #_SS_UP_MASK = const(0x00008)
+    #_SS_RIGHT_MASK = const(0x00040)
+    #_SS_CARDDET_MASK = const(0x00010)
+    _AW_CAMRST  =  const(10)
+    _AW_CAMPWDN =  const(7)
 
+    _NVM_RESOLUTION = const(1)
+    _NVM_EFFECT = const(2)
+    _NVM_MODE = const(3)
+    
     _INIT_SEQUENCE = (
         b"\x01\x80\x78"  # _SWRESET and Delay 120ms
         b"\x11\x80\x05"  # _SLPOUT and Delay 5ms
@@ -51,8 +71,22 @@ class PyCamera:
         b"\x29\x80\x05"  # _DISPON and Delay 5ms
         )
 
+    def i2c_scan(self):
+        while not self._i2c.try_lock():
+            pass
+
+        try:
+            print("I2C addresses found:",
+                    [hex(device_address) for device_address in self._i2c.scan()],
+                )
+        finally:  # unlock the i2c bus when ctrl-c'ing out of the loop
+            self._i2c.unlock()
+    
 
     def __init__(self) -> None:
+        if espidf.get_reserved_psram() < 1024 * 512:
+            raise RuntimeError("Please reserve at least 512kB of PSRAM!")
+        
         self.t = time.monotonic()
         self._i2c = board.I2C()
         self._spi = board.SPI()
@@ -61,17 +95,23 @@ class PyCamera:
         self.splash = displayio.Group()
         self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
         self._effect_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=4, y=10, scale=2)
+        self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
 
-        # seesaw GPIO expander
-        self._ss = Seesaw(self._i2c, 0x44, reset=False)
-        self._ss.sw_reset(0.01)
-        print("seesaw done @", time.monotonic()-self.t)
-        carddet = ss_dio.DigitalIO(self._ss, _SS_CARDDET)
-        carddet.switch_to_input(Pull.UP)
-        self.card_detect = Debouncer(carddet)
-        self._card_power = DigitalInOut(board.CARD_POWER)
-        self._card_power.switch_to_output(True)
+        # AW9523 GPIO expander
+        self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x5B)
+        print("Found AW9523")
+        self.backlight = self._aw.get_pin(_AW_BACKLIGHT)
+        self.backlight.switch_to_output(False)
         
+        self.carddet_pin = self._aw.get_pin(_AW_CARDDET)
+        self.card_detect = Debouncer(self.carddet_pin)
+        
+        self._card_power = self._aw.get_pin(_AW_SDPWR)
+        self._card_power.switch_to_output(True)
+
+        self.mute = self._aw.get_pin(_AW_MUTE)
+        self.mute.switch_to_output(False)
+
         self.sdcard = None
         try:
             self.mount_sd_card()
@@ -83,65 +123,71 @@ class PyCamera:
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
         self.accel.range = adafruit_lis3dh.RANGE_2_G
 
-        # lights!
-        # built in red LED
-        led = DigitalInOut(board.LED)
-        led.switch_to_output(False)
         # built in neopixels
-        neopixels = neopixel.NeoPixel(board.NEOPIXEL, 4, brightness=0.1)
-        neopixels.fill(0)
+        neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
+        neopix.fill(0)
         
         # camera!
-        self._cam_pwdn = ss_dio.DigitalIO(self._ss, _SS_CAMPWDN)
-        self._cam_pwdn.switch_to_output(True)
-        self._cam_reset = ss_dio.DigitalIO(self._ss, _SS_CAMRST)
+        self._cam_reset = self._aw.get_pin(_AW_CAMRST)
+        self._cam_pwdn = self._aw.get_pin(_AW_CAMPWDN)
+
         self._cam_reset.switch_to_output(False)
-
+        self._cam_pwdn.switch_to_output(True)
+        time.sleep(0.01)
+        self._cam_pwdn.switch_to_output(False)
+        time.sleep(0.01)
+        self._cam_reset.switch_to_output(True)
+        time.sleep(0.01)
+        
         print("pre cam @", time.monotonic()-self.t)
+        #self.i2c_scan()
 
-        self.camera = adafruit_ov5640.OV5640(
-            self._i2c,
+        print("Initializing camera")
+        self.camera = espcamera.Camera(
             data_pins=board.CAMERA_DATA,
-            clock=board.CAMERA_PCLK,
-            vsync=board.CAMERA_VSYNC,
-            href=board.CAMERA_HREF,
-            mclk=board.CAMERA_XCLK,
-            mclk_frequency=20_000_000,
-            size=adafruit_ov5640.OV5640_SIZE_HQVGA,
-            shutdown=self._cam_pwdn,
-            reset=self._cam_reset
-            )
-        print("Found camera ID %04x" % self.camera.chip_id)
+            external_clock_pin=board.CAMERA_XCLK,
+            pixel_clock_pin=board.CAMERA_PCLK,
+            vsync_pin=board.CAMERA_VSYNC,
+            href_pin=board.CAMERA_HREF,
+            pixel_format=espcamera.PixelFormat.RGB565,
+            frame_size=espcamera.FrameSize.QVGA,
+            i2c=board.I2C(),
+            external_clock_frequency=20_000_000,
+            framebuffer_count=2)
+        
+        print("Found camera %s (%d x %d)" % (self.camera.sensor_name, self.camera.width, self.camera.height))
         print("camera done @", time.monotonic()-self.t)
-        self.camera.flip_x = True
-        self.camera.flip_y = False
-        #self.camera.test_pattern = True
-        self.effect = adafruit_ov5640.OV5640_SPECIAL_EFFECT_NONE
-        self.camera.saturation = 3
+        print(dir(self.camera))
+
+        #display.auto_refresh = False
+
+        self.camera.hmirror = True
+        self.camera.vflip = False
 
         # action!
         if not self.display:
             self.init_display()
         
-        shut = DigitalInOut(board.BUTTON)
-        shut.switch_to_input(Pull.UP)
-        self.shutter = Debouncer(shut)
+        self.shutter_button = DigitalInOut(board.BUTTON)
+        self.shutter_button.switch_to_input(Pull.UP)
+        self.shutter = Debouncer(self.shutter_button)
 
-        up = ss_dio.DigitalIO(self._ss, _SS_UP)
-        up.switch_to_input(Pull.UP)
-        self.up = Debouncer(up)
-        down = ss_dio.DigitalIO(self._ss, _SS_DOWN)
-        down.switch_to_input(Pull.UP)
-        self.down = Debouncer(down)
-        left = ss_dio.DigitalIO(self._ss, _SS_LEFT)
-        left.switch_to_input(Pull.UP)
-        self.left = Debouncer(left)
-        right = ss_dio.DigitalIO(self._ss, _SS_RIGHT)
-        right.switch_to_input(Pull.UP)
-        self.right = Debouncer(right)
+        self.up_pin = self._aw.get_pin(_AW_UP)
+        self.up_pin.switch_to_input()
+        self.up = Debouncer(self.up_pin)
+        self.down_pin = self._aw.get_pin(_AW_DOWN)
+        self.down_pin.switch_to_input()
+        self.down = Debouncer(self.down_pin)
+        self.left_pin = self._aw.get_pin(_AW_LEFT)
+        self.left_pin.switch_to_input()
+        self.left = Debouncer(self.left_pin)
+        self.right_pin = self._aw.get_pin(_AW_RIGHT)
+        self.right_pin.switch_to_input()
+        self.right = Debouncer(self.right_pin)
 
         self._bigbuf = None
-        self._bitmap = displayio.Bitmap(240, 176, 65536)
+        self._bitmap1 = displayio.Bitmap(240, 176, 65535)
+        self._bitmap2 = displayio.Bitmap(240, 176, 65535)
 
         self._topbar = displayio.Group()
         self._res_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2)
@@ -150,12 +196,18 @@ class PyCamera:
 
         self._botbar = displayio.Group(x=0, y=210)
         self._botbar.append(self._effect_label)
+        self._botbar.append(self._mode_label)
 
         self.splash.append(self._topbar)
         self.splash.append(self._botbar)
         self.display.show(self.splash)
         self.display.refresh()
-        
+
+        #self.camera.colorbar = True
+        #self.effect = microcontroller.nvm[_NVM_EFFECT]
+        #self.camera.saturation = 3
+        #self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
+        #self.mode = microcontroller.nvm[_NVM_MODE]
         print("init done @", time.monotonic()-self.t)
 
     def select_setting(self, setting_name):
@@ -163,15 +215,42 @@ class PyCamera:
         self._effect_label.background_color = 0x0
         self._res_label.color = 0xFFFFFF
         self._res_label.background_color = 0x0
+        self._mode_label.color = 0xFFFFFF
+        self._mode_label.background_color = 0x0
         if setting_name == "effect":
             self._effect_label.color = 0x0
             self._effect_label.background_color = 0xFFFFFF
         if setting_name == "resolution":
             self._res_label.color = 0x0
             self._res_label.background_color = 0xFFFFFF
+        if setting_name == "mode":
+            self._mode_label.color = 0x0
+            self._mode_label.background_color = 0xFFFFFF
 
         self.display.refresh()
 
+    @property
+    def mode(self):
+        return self._mode
+
+    @property
+    def mode_text(self):
+        return self.modes[self._mode]
+    
+    @mode.setter
+    def mode(self, setting):
+        setting = (setting + len(self.modes)) % len(self.modes)
+        self._mode = setting
+        self._mode_label.text = self.modes[setting]
+        if self.modes[setting] == "STOP":
+            self.stop_motion_frame = 0
+        if self.modes[setting] == "GIF":
+            self._res_label.text = ""
+        else:
+            self.resolution = self.resolution # kick it to reset the display
+        microcontroller.nvm[_NVM_MODE] = setting
+        self.display.refresh()
+    
     @property
     def effect(self):
         return self._effect
@@ -182,6 +261,7 @@ class PyCamera:
         self._effect = setting
         self._effect_label.text = self.effects[setting]
         self.camera.effect = setting
+        microcontroller.nvm[_NVM_EFFECT] = setting
         self.display.refresh()
 
     @property
@@ -196,6 +276,7 @@ class PyCamera:
             res = self.resolutions.index(res)
         if isinstance(res, int):
             res = (res + len(self.resolutions)) % len(self.resolutions)
+            microcontroller.nvm[_NVM_RESOLUTION] = res
             self._resolution = res
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
@@ -283,22 +364,37 @@ class PyCamera:
 
 
     def keys_debounce(self):
-        self.card_detect.update()
+        # shutter button is true GPIO so we debounce as normal
         self.shutter.update()
-        self.up.update()
-        self.down.update()
-        self.left.update()
-        self.right.update()
+        self.card_detect.update(self.carddet_pin)
+        self.up.update(self.up_pin.value)
+        self.down.update(self.down_pin.value)
+        self.left.update(self.left_pin.value)
+        self.right.update(self.right_pin.value)
+
+    def tone(self, frequency, duration=0.1):
+        with pwmio.PWMOut(
+            board.SPEAKER, frequency=int(frequency), variable_frequency=False
+            ) as pwm:
+            self.mute.value = True
+            pwm.duty_cycle = 0x8000
+            time.sleep(duration)
+            self.mute.value = False
 
     def live_preview_mode(self):
         self.camera._write_list(adafruit_ov5640._sensor_default_regs)
         self.camera.size = adafruit_ov5640.OV5640_SIZE_HQVGA 
         self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_RGB
         self.effect = self._effect
+        self.continuous_capture_start()
 
-    def open_next_image(self):
+    def open_next_image(self, extension="jpg"):
+        try:
+            os.stat("/sd")
+        except OSError:            # no SD card!
+            raise RuntimeError("No SD card mounted")
         while True:
-            filename = "/sd/img%04d.jpg" % self._image_counter
+            filename = "/sd/img%04d.%s" % (self._image_counter, extension)
             self._image_counter += 1
             try:
                 os.stat(filename)
@@ -315,6 +411,7 @@ class PyCamera:
         self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_JPEG
         self.camera.size = self._resolution + 1  # starts at 1 not 0
         self.camera.quality = 4
+        time.sleep(0.1)
         b = bytearray(self.camera.capture_buffer_size)
         jpeg = self.camera.capture(b)
         print("Captured %d bytes of jpeg data (had allocated %d bytes" % (len(jpeg), self.camera.capture_buffer_size))
@@ -323,15 +420,21 @@ class PyCamera:
         with self.open_next_image() as f:
             f.write(jpeg)
         print("# Wrote image")
-            
-    def capture_and_blit(self):
+
+    def continuous_capture_start(self):
+        self._bitmap1 = self.camera.take(1)
+        #self.camera._imagecapture.continuous_capture_start(self._bitmap1, self._bitmap2)
+
+    def capture_into_bitmap(self, bitmap):
+        self.camera.capture(bitmap)
+
+    def continuous_capture(self):
+        return self.camera.take(1)
+
+    def blit(self, bitmap):
         self._display_bus.send(42, struct.pack(">hh", 80,
-                                               80 + self._bitmap.width - 1))
+                                               80 + bitmap.width - 1))
         self._display_bus.send(43, struct.pack(">hh", 32,
-                                               32 + self._bitmap.height - 1))
-        t = time.monotonic()
-        self.camera.capture(self._bitmap)
-        capture_time = time.monotonic()-t
-        self._display_bus.send(44, self._bitmap)
-        blit_time = time.monotonic()-capture_time-t
-        return (capture_time, blit_time)
+                                               32 + bitmap.height - 1))
+        self._display_bus.send(44, bitmap)
+
