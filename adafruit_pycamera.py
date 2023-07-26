@@ -3,7 +3,6 @@ import sys
 import time
 import struct
 import board
-import keypad
 from digitalio import DigitalInOut, Direction, Pull
 from adafruit_debouncer import Debouncer
 import busio
@@ -13,7 +12,6 @@ from rainbowio import colorwheel
 import sdcardio
 import storage
 import displayio
-#import adafruit_ov5640
 import espcamera
 from adafruit_st7789 import ST7789
 import terminalio
@@ -150,7 +148,7 @@ class PyCamera:
             vsync_pin=board.CAMERA_VSYNC,
             href_pin=board.CAMERA_HREF,
             pixel_format=espcamera.PixelFormat.RGB565,
-            frame_size=espcamera.FrameSize.QVGA,
+            frame_size=espcamera.FrameSize.HQVGA,
             i2c=board.I2C(),
             external_clock_frequency=20_000_000,
             framebuffer_count=2)
