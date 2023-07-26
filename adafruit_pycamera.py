@@ -29,9 +29,52 @@ from micropython import const
 
 
 class PyCamera:
-    resolutions = ("160x120", "176x144", "240x176", "240x240", "320x240", "400x296",
-                   "480x320", "640x480", "800x600", "1024x768", "1280x720", "1280x1024",
-                   "1600x1200", "2560x1440", "2560x1600", "1088x1920", "2560x1920")
+    resolutions = (
+        "160x120",
+        "176x144",
+        "240x176",
+        "240x240",
+        "320x240",
+        "400x296",
+        "480x320",
+        "640x480",
+        "720x1280",
+        "800x600",
+        "864x1536",
+        "1024x768",
+        "1080x1920",
+        "1280x1024",
+        "1280x720",
+        "1600x1200",
+        "1920x1080",
+        "2048x1536",
+        "2560x1440",
+        "2560x1600",
+        "2560x1920",
+    )
+    resolution_to_frame_size = [
+        espcamera.FrameSize.QQVGA,
+        espcamera.FrameSize.QCIF,
+        espcamera.FrameSize.HQVGA,
+        espcamera.FrameSize.R240X240,
+        espcamera.FrameSize.QVGA,
+        espcamera.FrameSize.CIF,
+        espcamera.FrameSize.HVGA,
+        espcamera.FrameSize.VGA,
+        espcamera.FrameSize.SVGA,
+        espcamera.FrameSize.XGA,
+        espcamera.FrameSize.HD,
+        espcamera.FrameSize.SXGA,
+        espcamera.FrameSize.UXGA,
+        espcamera.FrameSize.FHD,
+        espcamera.FrameSize.P_HD,
+        espcamera.FrameSize.P_3MP,
+        espcamera.FrameSize.QXGA,
+        espcamera.FrameSize.QHD,
+        espcamera.FrameSize.WQXGA,
+        espcamera.FrameSize.P_FHD,
+        espcamera.FrameSize.QSXGA,
+    ]
 
     effects = ("Normal", "Negative", "Grayscale", "Reddish", "Greenish", "Bluish", "Sepia", "Overexp", "Solarize")
     modes = ("JPEG", "GIF", "STOP")
@@ -204,8 +247,8 @@ class PyCamera:
         #self.camera.colorbar = True
         #self.effect = microcontroller.nvm[_NVM_EFFECT]
         #self.camera.saturation = 3
-        #self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
-        #self.mode = microcontroller.nvm[_NVM_MODE]
+        self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
+        self.mode = microcontroller.nvm[_NVM_MODE]
         print("init done @", time.monotonic()-self.t)
 
     def select_setting(self, setting_name):
@@ -380,10 +423,11 @@ class PyCamera:
             self.mute.value = False
 
     def live_preview_mode(self):
-        self.camera._write_list(adafruit_ov5640._sensor_default_regs)
-        self.camera.size = adafruit_ov5640.OV5640_SIZE_HQVGA 
-        self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_RGB
-        self.effect = self._effect
+        self.camera.reconfigure(
+            pixel_format=espcamera.PixelFormat.RGB565,
+            frame_size=espcamera.FrameSize.HQVGA,
+            )
+        #self.effect = self._effect
         self.continuous_capture_start()
 
     def open_next_image(self, extension="jpg"):
@@ -406,18 +450,26 @@ class PyCamera:
             os.stat("/sd")
         except OSError:            # no SD card!
             raise RuntimeError("No SD card mounted")
-        self.camera.colorspace = adafruit_ov5640.OV5640_COLOR_JPEG
-        self.camera.size = self._resolution + 1  # starts at 1 not 0
-        self.camera.quality = 4
+        
+        self.camera.reconfigure(
+            pixel_format=espcamera.PixelFormat.JPEG,
+            frame_size=self.resolution_to_frame_size[self._resolution]
+        )
         time.sleep(0.1)
-        b = bytearray(self.camera.capture_buffer_size)
-        jpeg = self.camera.capture(b)
-        print("Captured %d bytes of jpeg data (had allocated %d bytes" % (len(jpeg), self.camera.capture_buffer_size))
-        print("Resolution %d x %d" % (self.camera.width, self.camera.height))
 
-        with self.open_next_image() as f:
-            f.write(jpeg)
-        print("# Wrote image")
+        jpeg = self.camera.take(1)
+        if jpeg is not None:
+            print(f"Captured {len(jpeg)} bytes of jpeg data")
+            print("Resolution %d x %d" % (self.camera.width, self.camera.height))
+
+            with self.open_next_image() as f:
+                chunksize = 16384
+                for offset in range(0, len(jpeg), chunksize):
+                    f.write(jpeg[offset:offset+chunksize])
+                    print(end=".")
+            print("# Wrote image")
+        else:
+            print("# frame capture failed")
 
     def continuous_capture_start(self):
         self._bitmap1 = self.camera.take(1)
