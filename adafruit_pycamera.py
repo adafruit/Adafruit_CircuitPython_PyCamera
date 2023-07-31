@@ -5,6 +5,7 @@ import struct
 import board
 from digitalio import DigitalInOut, Direction, Pull
 from adafruit_debouncer import Debouncer
+import bitmaptools
 import busio
 import adafruit_lis3dh
 import neopixel
@@ -473,7 +474,8 @@ class PyCamera:
         self._bitmap1 = self.camera.take(1)
 
     def capture_into_bitmap(self, bitmap):
-        self.camera.capture(bitmap)
+        self._bitmap1 = self.camera.take(1)
+        bitmaptools.blit(bitmap, self._bitmap1, 0, 0)
 
     def continuous_capture(self):
         return self.camera.take(1)
