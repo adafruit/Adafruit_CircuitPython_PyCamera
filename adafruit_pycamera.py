@@ -227,8 +227,6 @@ class PyCamera:
         self.right = Debouncer(self.right_pin)
 
         self._bigbuf = None
-        self._bitmap1 = displayio.Bitmap(240, 176, 65535)
-        self._bitmap2 = displayio.Bitmap(240, 176, 65535)
 
         self._topbar = displayio.Group()
         self._res_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2)
@@ -473,7 +471,6 @@ class PyCamera:
 
     def continuous_capture_start(self):
         self._bitmap1 = self.camera.take(1)
-        #self.camera._imagecapture.continuous_capture_start(self._bitmap1, self._bitmap2)
 
     def capture_into_bitmap(self, bitmap):
         self.camera.capture(bitmap)
