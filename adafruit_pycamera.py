@@ -76,7 +76,7 @@ class PyCamera:
         espcamera.FrameSize.QSXGA,
     ]
 
-    effects = ("Normal", "Negative", "Grayscale", "Reddish", "Greenish", "Bluish", "Sepia", "Overexp", "Solarize")
+    effects = ("Normal", "Invert", "B&W", "Reddish", "Greenish", "Bluish", "Sepia")
     modes = ("JPEG", "GIF", "STOP")
     
     _AW_DOWN = const(15)
@@ -135,7 +135,7 @@ class PyCamera:
 
         self.splash = displayio.Group()
         self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
-        self._effect_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=4, y=10, scale=2)
+        self._effect_label = label.Label(terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2)
         self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
 
         # AW9523 GPIO expander
@@ -245,8 +245,8 @@ class PyCamera:
         self.display.refresh()
 
         #self.camera.colorbar = True
-        #self.effect = microcontroller.nvm[_NVM_EFFECT]
-        #self.camera.saturation = 3
+        self.effect = microcontroller.nvm[_NVM_EFFECT]
+        self.camera.saturation = 3
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
         print("init done @", time.monotonic()-self.t)
@@ -301,7 +301,7 @@ class PyCamera:
         setting = (setting + len(self.effects)) % len(self.effects)
         self._effect = setting
         self._effect_label.text = self.effects[setting]
-        self.camera.effect = setting
+        self.camera.special_effect = setting
         microcontroller.nvm[_NVM_EFFECT] = setting
         self.display.refresh()
 
