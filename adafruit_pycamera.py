@@ -5,6 +5,7 @@ import struct
 import board
 from digitalio import DigitalInOut, Direction, Pull
 from adafruit_debouncer import Debouncer
+import bitmaptools
 import busio
 import adafruit_lis3dh
 import neopixel
@@ -76,7 +77,7 @@ class PyCamera:
         espcamera.FrameSize.QSXGA,
     ]
 
-    effects = ("Normal", "Negative", "Grayscale", "Reddish", "Greenish", "Bluish", "Sepia", "Overexp", "Solarize")
+    effects = ("Normal", "Invert", "B&W", "Reddish", "Greenish", "Bluish", "Sepia")
     modes = ("JPEG", "GIF", "STOP")
     
     _AW_DOWN = const(15)
@@ -135,7 +136,7 @@ class PyCamera:
 
         self.splash = displayio.Group()
         self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
-        self._effect_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=4, y=10, scale=2)
+        self._effect_label = label.Label(terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2)
         self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
 
         # AW9523 GPIO expander
@@ -227,8 +228,6 @@ class PyCamera:
         self.right = Debouncer(self.right_pin)
 
         self._bigbuf = None
-        self._bitmap1 = displayio.Bitmap(240, 176, 65535)
-        self._bitmap2 = displayio.Bitmap(240, 176, 65535)
 
         self._topbar = displayio.Group()
         self._res_label = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2)
@@ -245,8 +244,8 @@ class PyCamera:
         self.display.refresh()
 
         #self.camera.colorbar = True
-        #self.effect = microcontroller.nvm[_NVM_EFFECT]
-        #self.camera.saturation = 3
+        self.effect = microcontroller.nvm[_NVM_EFFECT]
+        self.camera.saturation = 3
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
         print("init done @", time.monotonic()-self.t)
@@ -301,7 +300,7 @@ class PyCamera:
         setting = (setting + len(self.effects)) % len(self.effects)
         self._effect = setting
         self._effect_label.text = self.effects[setting]
-        self.camera.effect = setting
+        self.camera.special_effect = setting
         microcontroller.nvm[_NVM_EFFECT] = setting
         self.display.refresh()
 
@@ -473,10 +472,10 @@ class PyCamera:
 
     def continuous_capture_start(self):
         self._bitmap1 = self.camera.take(1)
-        #self.camera._imagecapture.continuous_capture_start(self._bitmap1, self._bitmap2)
 
     def capture_into_bitmap(self, bitmap):
-        self.camera.capture(bitmap)
+        self._bitmap1 = self.camera.take(1)
+        bitmaptools.blit(bitmap, self._bitmap1, 0, 0)
 
     def continuous_capture(self):
         return self.camera.take(1)

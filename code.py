@@ -6,7 +6,7 @@ import board
 import adafruit_pycamera
 import displayio
 import gifio
-#import ulab.numpy as np
+import ulab.numpy as np
 import bitmaptools
 
 
@@ -21,7 +21,6 @@ print("Starting!")
 last_frame = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 onionskin = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 while True:
-    """
     if  (pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0):
         # alpha blend
         new_frame = pycam.continuous_capture()
@@ -29,8 +28,7 @@ while True:
                                displayio.Colorspace.RGB565_SWAPPED)
         pycam.blit(onionskin)
     else:
-    """
-    pycam.blit(pycam.continuous_capture())
+        pycam.blit(pycam.continuous_capture())
     #print("\t\t", capture_time, blit_time)
 
     pycam.keys_debounce()
