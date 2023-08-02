@@ -77,7 +77,7 @@ class PyCamera:
         espcamera.FrameSize.QSXGA,
     ]
 
-    effects = ("Normal", "Invert", "B&W", "Reddish", "Greenish", "Bluish", "Sepia")
+    effects = ("Normal", "Invert", "B&W", "Reddish", "Greenish", "Bluish", "Sepia", "Solarize")
     modes = ("JPEG", "GIF", "STOP")
     
     _AW_DOWN = const(15)
