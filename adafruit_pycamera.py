@@ -343,8 +343,8 @@ class PyCamera:
         self._display_bus = None
         self.display = None
 
-    def display_message(self, message, color=0xFF0000):
-        text_area = label.Label(terminalio.FONT, text=message, color=color, scale=3)
+    def display_message(self, message, color=0xFF0000, scale=3):
+        text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
         text_area.anchor_point = (0.5, 0.5)
         text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
         
