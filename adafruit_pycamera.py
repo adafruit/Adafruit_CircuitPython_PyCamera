@@ -31,51 +31,53 @@ from micropython import const
 
 class PyCamera:
     resolutions = (
-        "160x120",
-        "176x144",
-        "240x176",
+        #"160x120",
+        #"176x144",
+        #"240x176",
         "240x240",
         "320x240",
-        "400x296",
-        "480x320",
+        #"400x296",
+        #"480x320",
         "640x480",
-        "720x1280",
         "800x600",
-        "864x1536",
         "1024x768",
-        "1080x1920",
-        "1280x1024",
         "1280x720",
+        "1280x1024",
         "1600x1200",
         "1920x1080",
+        #"720x1280",
+        #"864x1536",
         "2048x1536",
         "2560x1440",
         "2560x1600",
+        #"1080x1920",
         "2560x1920",
     )
-    resolution_to_frame_size = [
-        espcamera.FrameSize.QQVGA,
-        espcamera.FrameSize.QCIF,
-        espcamera.FrameSize.HQVGA,
-        espcamera.FrameSize.R240X240,
-        espcamera.FrameSize.QVGA,
-        espcamera.FrameSize.CIF,
-        espcamera.FrameSize.HVGA,
-        espcamera.FrameSize.VGA,
-        espcamera.FrameSize.SVGA,
-        espcamera.FrameSize.XGA,
-        espcamera.FrameSize.HD,
-        espcamera.FrameSize.SXGA,
-        espcamera.FrameSize.UXGA,
-        espcamera.FrameSize.FHD,
-        espcamera.FrameSize.P_HD,
-        espcamera.FrameSize.P_3MP,
-        espcamera.FrameSize.QXGA,
-        espcamera.FrameSize.QHD,
-        espcamera.FrameSize.WQXGA,
-        espcamera.FrameSize.P_FHD,
-        espcamera.FrameSize.QSXGA,
-    ]
+    resolution_to_frame_size = (
+        #espcamera.FrameSize.QQVGA,
+        #espcamera.FrameSize.QCIF,
+        #espcamera.FrameSize.HQVGA,
+        espcamera.FrameSize.R240X240, # 240x240
+        espcamera.FrameSize.QVGA, # 320x240
+        #espcamera.FrameSize.CIF, # 400x296
+        #espcamera.FrameSize.HVGA, # 480x320
+        espcamera.FrameSize.VGA,   #  640x480
+        espcamera.FrameSize.SVGA, # 800x600
+        espcamera.FrameSize.XGA, # 1024x768
+        espcamera.FrameSize.HD, # 1280x720 
+        espcamera.FrameSize.SXGA, # 1280x1024
+        espcamera.FrameSize.UXGA, # 1600x1200
+        espcamera.FrameSize.FHD, # 1920x1080
+        #espcamera.FrameSize.P_HD, # 720x1280
+        # espcamera.FrameSize.P_3MP, # 864x1536
+        espcamera.FrameSize.QXGA, # 2048x1536
+        espcamera.FrameSize.QHD, # 2560x1440
+        espcamera.FrameSize.WQXGA, # 2560x1600
+        #espcamera.FrameSize.P_FHD, # 1080x1920
+        espcamera.FrameSize.QSXGA, # 2560x1920
+    )
+    combined_list = list(zip(resolutions, resolution_to_frame_size))
+    print(combined_list)
 
     effects = ("Normal", "Invert", "B&W", "Reddish", "Greenish", "Bluish", "Sepia", "Solarize")
     modes = ("JPEG", "GIF", "STOP")
