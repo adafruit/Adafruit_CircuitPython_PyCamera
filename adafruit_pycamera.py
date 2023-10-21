@@ -242,7 +242,7 @@ class PyCamera:
 
         self.splash.append(self._topbar)
         self.splash.append(self._botbar)
-        self.display.show(self.splash)
+        self.display.root_group = self.splash
         self.display.refresh()
 
         #self.camera.colorbar = True
