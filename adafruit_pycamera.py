@@ -166,8 +166,9 @@ class PyCamera:
         self.accel.range = adafruit_lis3dh.RANGE_2_G
 
         # built in neopixels
-        neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
-        neopix.fill(0)
+        # MEME FIX: https://github.com/adafruit/circuitpython/issues/8488
+        #neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
+        #neopix.fill(0)
         
         # camera!
         self._cam_reset = self._aw.get_pin(_AW_CAMRST)
@@ -346,6 +347,8 @@ class PyCamera:
     def display_message(self, message, color=0xFF0000, scale=3):
         text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
         text_area.anchor_point = (0.5, 0.5)
+        if not self.display:
+            self.init_display()
         text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
         
         # Show it
