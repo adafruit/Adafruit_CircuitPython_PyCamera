@@ -166,9 +166,8 @@ class PyCamera:
         self.accel.range = adafruit_lis3dh.RANGE_2_G
 
         # built in neopixels
-        # MEME FIX: https://github.com/adafruit/circuitpython/issues/8488
-        #neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
-        #neopix.fill(0)
+        neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
+        neopix.fill(0)
         
         # camera!
         self._cam_reset = self._aw.get_pin(_AW_CAMRST)
@@ -409,7 +408,7 @@ class PyCamera:
     def keys_debounce(self):
         # shutter button is true GPIO so we debounce as normal
         self.shutter.update()
-        self.card_detect.update(self.carddet_pin)
+        self.card_detect.update(self.carddet_pin.value)
         self.up.update(self.up_pin.value)
         self.down.update(self.down_pin.value)
         self.left.update(self.left_pin.value)
