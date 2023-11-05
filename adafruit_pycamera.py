@@ -82,24 +82,21 @@ class PyCamera:
     effects = ("Normal", "Invert", "B&W", "Reddish", "Greenish", "Bluish", "Sepia", "Solarize")
     modes = ("JPEG", "GIF", "STOP")
     
+    _AW_MUTE =   const(0)
+    _AW_SELECT =   const(1)
+    _AW_CARDDET =   const(8)
+    _AW_SDPWR =   const(9)
     _AW_DOWN = const(15)
     _AW_LEFT =  const(14)
     _AW_UP =  const(13)
     _AW_RIGHT =   const(12)
     _AW_OK =   const(11)
-    _AW_SELECT =   const(1)
-    _AW_BACKLIGHT =   const(2)
-    _AW_CARDDET =   const(8)
-    _AW_MUTE =   const(0)
-    _AW_SDPWR =   const(9)
     #_SS_ALL_BUTTONS_MASK = const(0b000010000000001011100)
     #_SS_DOWN_MASK = const(0x10000)
     #_SS_LEFT_MASK = const(0x00004)
     #_SS_UP_MASK = const(0x00008)
     #_SS_RIGHT_MASK = const(0x00040)
     #_SS_CARDDET_MASK = const(0x00010)
-    _AW_CAMRST  =  const(10)
-    _AW_CAMPWDN =  const(7)
 
     _NVM_RESOLUTION = const(1)
     _NVM_EFFECT = const(2)
@@ -142,10 +139,8 @@ class PyCamera:
         self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
 
         # AW9523 GPIO expander
-        self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x5B)
+        self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x58)
         print("Found AW9523")
-        self.backlight = self._aw.get_pin(_AW_BACKLIGHT)
-        self.backlight.switch_to_output(False)
         
         self.carddet_pin = self._aw.get_pin(_AW_CARDDET)
         self.card_detect = Debouncer(self.carddet_pin)
@@ -172,8 +167,8 @@ class PyCamera:
         neopix.fill(0)
         
         # camera!
-        self._cam_reset = self._aw.get_pin(_AW_CAMRST)
-        self._cam_pwdn = self._aw.get_pin(_AW_CAMPWDN)
+        self._cam_reset = DigitalInOut(board.CAMERA_RESET)
+        self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
 
         self._cam_reset.switch_to_output(False)
         self._cam_pwdn.switch_to_output(True)
@@ -184,7 +179,7 @@ class PyCamera:
         time.sleep(0.01)
         
         print("pre cam @", time.monotonic()-self.t)
-        #self.i2c_scan()
+        self.i2c_scan()
 
         print("Initializing camera")
         self.camera = espcamera.Camera(
@@ -206,7 +201,7 @@ class PyCamera:
         #display.auto_refresh = False
 
         self.camera.hmirror = True
-        self.camera.vflip = False
+        self.camera.vflip = True
 
         # action!
         if not self.display:
@@ -336,7 +331,7 @@ class PyCamera:
         self.display = displayio.Display(self._display_bus, self._INIT_SEQUENCE,
                                          width=240, height=240, colstart=80,
                                          auto_refresh=False)
-        self.display.show(self.splash)
+        self.display.root_group = self.splash
         self.display.refresh()
         
     def deinit_display(self):
@@ -388,7 +383,7 @@ class PyCamera:
         self._card_power.value = False
         card_cs.deinit()
         print("sdcard init @", time.monotonic()-self.t)
-        self.sdcard = sdcardio.SDCard(self._spi, board.CARD_CS, baudrate=60000000)
+        self.sdcard = sdcardio.SDCard(self._spi, board.CARD_CS, baudrate=20_000_000)
         vfs = storage.VfsFat(self.sdcard)
         print("mount vfs @", time.monotonic()-self.t)
         storage.mount(vfs, "/sd")
