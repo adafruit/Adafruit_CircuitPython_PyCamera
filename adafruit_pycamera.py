@@ -20,16 +20,34 @@ from adafruit_display_text import label
 import pwmio
 import microcontroller
 import adafruit_aw9523
-import espidf
+from adafruit_bus_device.i2c_device import I2CDevice
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
 
 from micropython import const
 
+_REG_DLY = const(0xFFFF)
+
+AUTOFOCUS_STAT_FIRMWAREBAD = 0x7F
+AUTOFOCUS_STAT_STARTUP = 0x7E
+AUTOFOCUS_STAT_IDLE = 0x70
+AUTOFOCUS_STAT_FOCUSING = 0x00
+AUTOFOCUS_STAT_FOCUSED = 0x10
 
 
 class PyCamera:
+    _finalize_firmware_load = (
+            0x3022, 0x00,
+            0x3023, 0x00,
+            0x3024, 0x00,
+            0x3025, 0x00,
+            0x3026, 0x00,
+            0x3027, 0x00,
+            0x3028, 0x00,
+            0x3029, 0x7f,
+            0x3000, 0x00,
+    )
     resolutions = (
         #"160x120",
         #"176x144",
@@ -125,9 +143,6 @@ class PyCamera:
     
 
     def __init__(self) -> None:
-        if espidf.get_reserved_psram() < 1024 * 512:
-            raise RuntimeError("Please reserve at least 512kB of PSRAM!")
-        
         self.t = time.monotonic()
         self._i2c = board.I2C()
         self._spi = board.SPI()
@@ -138,18 +153,60 @@ class PyCamera:
         self._effect_label = label.Label(terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2)
         self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
 
+        # turn on the display first, its reset line may be shared with the IO expander(?)
+        if not self.display:
+            self.init_display()
+
+        self.shutter_button = DigitalInOut(board.BUTTON)
+        self.shutter_button.switch_to_input(Pull.UP)
+        self.shutter = Debouncer(self.shutter_button)
+
+        print("reset camera")
+        self._cam_reset = DigitalInOut(board.CAMERA_RESET)
+        self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
+
+        self._cam_reset.switch_to_output(False)
+        self._cam_pwdn.switch_to_output(True)
+        time.sleep(0.01)
+        self._cam_pwdn.switch_to_output(False)
+        time.sleep(0.01)
+        self._cam_reset.switch_to_output(True)
+        time.sleep(0.01)
+
+        print("pre cam @", time.monotonic()-self.t)
+        self.i2c_scan()
+
         # AW9523 GPIO expander
         self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x58)
         print("Found AW9523")
-        
-        self.carddet_pin = self._aw.get_pin(_AW_CARDDET)
-        self.card_detect = Debouncer(self.carddet_pin)
-        
-        self._card_power = self._aw.get_pin(_AW_SDPWR)
-        self._card_power.switch_to_output(True)
 
-        self.mute = self._aw.get_pin(_AW_MUTE)
-        self.mute.switch_to_output(False)
+        def make_expander_input(pin_no):
+            pin = self._aw.get_pin(pin_no)
+            pin.switch_to_input()
+            return pin
+
+        def make_expander_output(pin_no, value):
+            pin = self._aw.get_pin(pin_no)
+            pin.switch_to_output(value)
+            return pin
+
+        def make_debounced_expander_pin(pin_no):
+            pin = self._aw.get_pin(pin_no)
+            pin.switch_to_input()
+            return Debouncer(make_expander_input(pin_no))
+
+
+        self.up = make_debounced_expander_pin(_AW_UP)
+        self.left = make_debounced_expander_pin(_AW_LEFT)
+        self.right = make_debounced_expander_pin(_AW_RIGHT)
+        self.down = make_debounced_expander_pin(_AW_DOWN)
+        self.select = make_debounced_expander_pin(_AW_SELECT)
+        self.ok = make_debounced_expander_pin(_AW_OK)
+        self.card_detect = make_debounced_expander_pin(_AW_CARDDET)
+        
+        self._card_power = make_expander_output(_AW_SDPWR, True)
+
+        self.mute = make_expander_input(_AW_MUTE)
 
         self.sdcard = None
         try:
@@ -165,21 +222,6 @@ class PyCamera:
         # built in neopixels
         neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
         neopix.fill(0)
-        
-        # camera!
-        self._cam_reset = DigitalInOut(board.CAMERA_RESET)
-        self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
-
-        self._cam_reset.switch_to_output(False)
-        self._cam_pwdn.switch_to_output(True)
-        time.sleep(0.01)
-        self._cam_pwdn.switch_to_output(False)
-        time.sleep(0.01)
-        self._cam_reset.switch_to_output(True)
-        time.sleep(0.01)
-        
-        print("pre cam @", time.monotonic()-self.t)
-        self.i2c_scan()
 
         print("Initializing camera")
         self.camera = espcamera.Camera(
@@ -194,35 +236,15 @@ class PyCamera:
             external_clock_frequency=20_000_000,
             framebuffer_count=2)
         
-        print("Found camera %s (%d x %d)" % (self.camera.sensor_name, self.camera.width, self.camera.height))
+        print("Found camera %s (%d x %d) at I2C address %02x" % (self.camera.sensor_name, self.camera.width, self.camera.height, self.camera.address))
         print("camera done @", time.monotonic()-self.t)
         print(dir(self.camera))
 
+        self._camera_device = I2CDevice(self._i2c, self.camera.address)
         #display.auto_refresh = False
 
         self.camera.hmirror = True
         self.camera.vflip = True
-
-        # action!
-        if not self.display:
-            self.init_display()
-        
-        self.shutter_button = DigitalInOut(board.BUTTON)
-        self.shutter_button.switch_to_input(Pull.UP)
-        self.shutter = Debouncer(self.shutter_button)
-
-        self.up_pin = self._aw.get_pin(_AW_UP)
-        self.up_pin.switch_to_input()
-        self.up = Debouncer(self.up_pin)
-        self.down_pin = self._aw.get_pin(_AW_DOWN)
-        self.down_pin.switch_to_input()
-        self.down = Debouncer(self.down_pin)
-        self.left_pin = self._aw.get_pin(_AW_LEFT)
-        self.left_pin.switch_to_input()
-        self.left = Debouncer(self.left_pin)
-        self.right_pin = self._aw.get_pin(_AW_RIGHT)
-        self.right_pin.switch_to_input()
-        self.right = Debouncer(self.right_pin)
 
         self._bigbuf = None
 
@@ -246,6 +268,82 @@ class PyCamera:
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
         print("init done @", time.monotonic()-self.t)
+
+    def autofocus_init_from_file(self, filename):
+        with open(filename, mode='rb') as file:
+            firmware = file.read()
+        self.autofocus_init_from_bitstream(firmware)
+
+    def write_camera_register(self, reg: int, value: int) -> None:
+        b = bytearray(3)
+        b[0] = reg >> 8
+        b[1] = reg & 0xFF
+        b[2] = value
+        with self._camera_device as i2c:
+            i2c.write(b)
+
+    def write_camera_list(self, reg_list: Sequence[int]) -> None:
+        for i in range(0, len(reg_list), 2):
+            register = reg_list[i]
+            value = reg_list[i + 1]
+            if register == _REG_DLY:
+                time.sleep(value / 1000)
+            else:
+                self.write_camera_register(register, value)
+
+    def read_camera_register(self, reg: int) -> int:
+        b = bytearray(2)
+        b[0] = reg >> 8
+        b[1] = reg & 0xFF
+        with self._camera_device as i2c:
+            i2c.write(b)
+            i2c.readinto(b, end=1)
+        return b[0]
+
+    def autofocus_init_from_bitstream(self, firmware):
+        self.write_camera_register(0x3000, 0x20) # reset autofocus coprocessor
+
+        for addr,val in enumerate(firmware):
+            self.write_camera_register(0x8000+addr, val)
+
+        self.write_camera_list(self._finalize_firmware_load)
+        for _ in range(100):
+            self._print_focus_status("init from bitstream")
+            if self.autofocus_status == AUTOFOCUS_STAT_IDLE:
+                break
+            time.sleep(0.01)
+        else:
+            raise RuntimeError("Timed out after trying to load autofocus firmware")
+
+    def autofocus_init(self):
+        if '/' in __file__:
+            binfile = __file__.rsplit("/", 1)[0].rsplit(".", 1)[0] + "/ov5640_autofocus.bin"
+        else:
+            binfile = "ov5640_autofocus.bin"
+        print(binfile)
+        return self.autofocus_init_from_file(binfile)
+
+    @property
+    def autofocus_status(self):
+        return self.read_camera_register(0x3029)
+
+    def _print_focus_status(self, msg):
+        print(f"{msg:36} status={self.autofocus_status:02x} busy?={self.read_camera_register(0x3032):02x}")
+
+    def _send_autofocus_command(self, command, msg):
+        self.write_camera_register(0x3023, 0x01) # clear command ack
+        self.write_camera_register(0x3022, command) # release focus
+        for _ in range(100):
+            self._print_focus_status(msg)
+            if self.read_camera_register(0x3032) == 0x0: # command is finished
+                break
+            time.sleep(0.01)
+        else:
+            raise RuntimeError("Timed out {msg}")
+
+    def autofocus(self) -> None:
+        self._send_autofocus_command(0x08, "release focus")
+        self._send_autofocus_command(0x04, "autofocus")
 
     def select_setting(self, setting_name):
         self._effect_label.color = 0xFFFFFF
@@ -405,11 +503,13 @@ class PyCamera:
     def keys_debounce(self):
         # shutter button is true GPIO so we debounce as normal
         self.shutter.update()
-        self.card_detect.update(self.carddet_pin.value)
-        self.up.update(self.up_pin.value)
-        self.down.update(self.down_pin.value)
-        self.left.update(self.left_pin.value)
-        self.right.update(self.right_pin.value)
+        self.card_detect.update()
+        self.up.update()
+        self.down.update()
+        self.left.update()
+        self.right.update()
+        self.select.update()
+        self.ok.update()
 
     def tone(self, frequency, duration=0.1):
         with pwmio.PWMOut(

@@ -1,3 +1,7 @@
+
+
+
+
 import os
 import sys
 import time
@@ -9,8 +13,8 @@ import gifio
 import ulab.numpy as np
 import bitmaptools
 
-
 pycam = adafruit_pycamera.PyCamera()
+pycam.autofocus_init()
 #pycam.live_preview_mode()
 
 settings = (None, "resolution", "effect", "mode")
@@ -20,6 +24,7 @@ print("Starting!")
 #pycam.tone(200, 0.1)
 last_frame = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 onionskin = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
+last_autofocus_status = 0xff
 while True:
     if  (pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0):
         # alpha blend
@@ -110,8 +115,8 @@ while True:
                 pycam.mount_sd_card()
                 print("Success!")
                 break
-            except OSError:
-                print("Retrying!")
+            except OSError as e:
+                print("Retrying!", e)
                 time.sleep(0.5)
         else:
             pycam.display_message("SD Card\nFailed!", color=0xFF0000)
@@ -142,3 +147,14 @@ while True:
         pycam.select_setting(settings[curr_setting])
         #new_res = max(1, pycam.get_resolution()-1)
         #pycam.set_resolution(pycam.resolutions[new_res])
+    if pycam.select.fell:
+        print("SEL")
+        print(pycam.autofocus_status)
+        pycam.autofocus()
+        print(pycam.autofocus_status)
+    if pycam.ok.fell:
+        print("OK")
+    autofocus_status = pycam.autofocus_status
+    if autofocus_status != last_autofocus_status:
+        print(f"autofocus status {last_autofocus_status:02x} -> {autofocus_status:02x}")
+        last_autofocus_status = autofocus_status
