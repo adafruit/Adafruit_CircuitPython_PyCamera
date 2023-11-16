@@ -243,7 +243,7 @@ class PyCamera:
         neopix.deinit()
 
         # front bezel neopixels
-        self.pixels = neopixel.NeoPixel(board.A0, 8, brightness=0.1, pixel_order=neopixel.RGBW)
+        self.pixels = neopixel.NeoPixel(board.A1, 8, brightness=0.1, pixel_order=neopixel.RGBW)
         self.pixels.fill(0)
 
         print("Initializing camera")
