@@ -24,7 +24,6 @@ print("Starting!")
 #pycam.tone(200, 0.1)
 last_frame = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 onionskin = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
-last_autofocus_status = 0xff
 while True:
     if  (pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0):
         # alpha blend
@@ -154,7 +153,3 @@ while True:
         print(pycam.autofocus_status)
     if pycam.ok.fell:
         print("OK")
-    autofocus_status = pycam.autofocus_status
-    if autofocus_status != last_autofocus_status:
-        print(f"autofocus status {last_autofocus_status:02x} -> {autofocus_status:02x}")
-        last_autofocus_status = autofocus_status
