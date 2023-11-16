@@ -29,12 +29,24 @@ from micropython import const
 
 _REG_DLY = const(0xFFFF)
 
-AUTOFOCUS_STAT_FIRMWAREBAD = 0x7F
-AUTOFOCUS_STAT_STARTUP = 0x7E
-AUTOFOCUS_STAT_IDLE = 0x70
-AUTOFOCUS_STAT_FOCUSING = 0x00
-AUTOFOCUS_STAT_FOCUSED = 0x10
+_OV5640_STAT_FIRMWAREBAD = const(0x7F)
+_OV5640_STAT_STARTUP = const(0x7E)
+_OV5640_STAT_IDLE = const(0x70)
+_OV5640_STAT_FOCUSING = const(0x00)
+_OV5640_STAT_FOCUSED = const(0x10)
 
+_OV5640_CMD_TRIGGER_AUTOFOCUS = const(0x03)
+_OV5640_CMD_AUTO_AUTOFOCUS = const(0x04)
+_OV5640_CMD_RELEASE_FOCUS = const(0x08)
+
+_OV5640_CMD_MAIN = const(0x3022)
+_OV5640_CMD_ACK = const(0x3023)
+_OV5640_CMD_PARA0 = const(0x3024)
+_OV5640_CMD_PARA1 = const(0x3025)
+_OV5640_CMD_PARA2 = const(0x3026)
+_OV5640_CMD_PARA3 = const(0x3027)
+_OV5640_CMD_PARA4 = const(0x3028)
+_OV5640_CMD_FW_STATUS = const(0x3029)
 
 class PyCamera:
     _finalize_firmware_load = (
@@ -301,15 +313,18 @@ class PyCamera:
         return b[0]
 
     def autofocus_init_from_bitstream(self, firmware):
+        if self.camera.sensor_name != "OV5640":
+            raise RuntimeError(f"Autofocus not supported on {self.camera.sensor_name}")
+
         self.write_camera_register(0x3000, 0x20) # reset autofocus coprocessor
 
-        for addr,val in enumerate(firmware):
+        for addr, val in enumerate(firmware):
             self.write_camera_register(0x8000+addr, val)
 
         self.write_camera_list(self._finalize_firmware_load)
         for _ in range(100):
             self._print_focus_status("init from bitstream")
-            if self.autofocus_status == AUTOFOCUS_STAT_IDLE:
+            if self.autofocus_status == _OV5640_STAT_IDLE:
                 break
             time.sleep(0.01)
         else:
@@ -325,25 +340,29 @@ class PyCamera:
 
     @property
     def autofocus_status(self):
-        return self.read_camera_register(0x3029)
+        return self.read_camera_register(_OV5640_CMD_FW_STATUS)
 
     def _print_focus_status(self, msg):
-        print(f"{msg:36} status={self.autofocus_status:02x} busy?={self.read_camera_register(0x3032):02x}")
+        if True:
+            print(f"{msg:36} status={self.autofocus_status:02x} busy?={self.read_camera_register(_OV5640_CMD_ACK):02x}")
 
     def _send_autofocus_command(self, command, msg):
-        self.write_camera_register(0x3023, 0x01) # clear command ack
-        self.write_camera_register(0x3022, command) # release focus
+        self.write_camera_register(_OV5640_CMD_ACK, 0x01) # clear command ack
+        self.write_camera_register(_OV5640_CMD_MAIN, command) # send command
         for _ in range(100):
             self._print_focus_status(msg)
-            if self.read_camera_register(0x3032) == 0x0: # command is finished
+            if self.read_camera_register(_OV5640_CMD_ACK) == 0x0: # command is finished
                 break
             time.sleep(0.01)
         else:
-            raise RuntimeError("Timed out {msg}")
+            raise RuntimeError(f"Timed out {msg}")
 
-    def autofocus(self) -> None:
-        self._send_autofocus_command(0x08, "release focus")
-        self._send_autofocus_command(0x04, "autofocus")
+    def autofocus(self) -> list[int]:
+        self._send_autofocus_command(_OV5640_CMD_RELEASE_FOCUS, "release focus")
+        self._send_autofocus_command(_OV5640_CMD_TRIGGER_AUTOFOCUS, "autofocus")
+        zone_focus = [self.read_camera_register(_OV5640_CMD_PARA0 + i) for i in range(5)]
+        print(f"zones focused: {zone_focus}")
+        return zone_focus
 
     def select_setting(self, setting_name):
         self._effect_label.color = 0xFFFFFF
