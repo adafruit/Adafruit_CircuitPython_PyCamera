@@ -17,7 +17,7 @@ pycam = adafruit_pycamera.PyCamera()
 pycam.autofocus_init()
 #pycam.live_preview_mode()
 
-settings = (None, "resolution", "effect", "mode")
+settings = (None, "resolution", "effect", "mode", "led_level", "led_color")
 curr_setting = 0
 
 print("Starting!")

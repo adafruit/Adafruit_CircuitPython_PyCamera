@@ -21,6 +21,7 @@ import pwmio
 import microcontroller
 import adafruit_aw9523
 from adafruit_bus_device.i2c_device import I2CDevice
+from rainbowio import colorwheel
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
@@ -60,6 +61,11 @@ class PyCamera:
             0x3029, 0x7f,
             0x3000, 0x00,
     )
+    led_levels = [0., .1, .2, .5, 1.]
+
+    colors = [0xffffff, 0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff,
+        [colorwheel(i*(256//8)) for i in range(8)]]
+
     resolutions = (
         #"160x120",
         #"176x144",
@@ -231,9 +237,14 @@ class PyCamera:
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
         self.accel.range = adafruit_lis3dh.RANGE_2_G
 
-        # built in neopixels
+        # main board neopixel
         neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
         neopix.fill(0)
+        neopix.deinit()
+
+        # front bezel neopixels
+        self.pixels = neopixel.NeoPixel(board.A0, 8, brightness=0.1, pixel_order=neopixel.RGBW)
+        self.pixels.fill(0)
 
         print("Initializing camera")
         self.camera = espcamera.Camera(
@@ -273,6 +284,9 @@ class PyCamera:
         self.splash.append(self._botbar)
         self.display.root_group = self.splash
         self.display.refresh()
+
+        self.led_color = 0
+        self.led_level = 0
 
         #self.camera.colorbar = True
         self.effect = microcontroller.nvm[_NVM_EFFECT]
@@ -369,18 +383,26 @@ class PyCamera:
         self._effect_label.background_color = 0x0
         self._res_label.color = 0xFFFFFF
         self._res_label.background_color = 0x0
+        self._res_label.text = self.resolutions[self._resolution]
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
         if setting_name == "effect":
             self._effect_label.color = 0x0
             self._effect_label.background_color = 0xFFFFFF
-        if setting_name == "resolution":
+        elif setting_name == "resolution":
             self._res_label.color = 0x0
             self._res_label.background_color = 0xFFFFFF
-        if setting_name == "mode":
+        elif setting_name == "mode":
             self._mode_label.color = 0x0
             self._mode_label.background_color = 0xFFFFFF
-
+        elif setting_name == "led_level":
+            self._res_label.text = "LED LV"
+            self._res_label.color = 0x0
+            self._res_label.background_color = 0xFFFFFF
+        elif setting_name == "led_color":
+            self._res_label.text = "LED CLR"
+            self._res_label.color = 0x0
+            self._res_label.background_color = 0xFFFFFF
         self.display.refresh()
 
     @property
@@ -605,3 +627,28 @@ class PyCamera:
                                                32 + bitmap.height - 1))
         self._display_bus.send(44, bitmap)
 
+    @property
+    def led_level(self):
+        return self._led_level
+
+    @led_level.setter
+    def led_level(self, new_level):
+        level = (new_level + len(self.led_levels)) % len(self.led_levels)
+        self._led_level = level
+        self.pixels.brightness = self.led_levels[level]
+        self.led_color = self.led_color
+
+    @property
+    def led_color(self):
+        return self._led_color
+
+    @led_color.setter
+    def led_color(self, new_color):
+        color = (new_color + len(self.colors)) % len(self.colors)
+        self._led_color = color
+        colors = self.colors[color]
+        print("colors", colors)
+        if isinstance(colors, int):
+            self.pixels.fill(colors)
+        else:
+            self.pixels[:] = colors
