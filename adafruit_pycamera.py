@@ -4,7 +4,7 @@ import time
 import struct
 import board
 from digitalio import DigitalInOut, Direction, Pull
-from adafruit_debouncer import Debouncer
+from adafruit_debouncer import Debouncer, Button
 import bitmaptools
 import busio
 import adafruit_lis3dh
@@ -177,7 +177,7 @@ class PyCamera:
 
         self.shutter_button = DigitalInOut(board.BUTTON)
         self.shutter_button.switch_to_input(Pull.UP)
-        self.shutter = Debouncer(self.shutter_button)
+        self.shutter = Button(self.shutter_button)
 
         print("reset camera")
         self._cam_reset = DigitalInOut(board.CAMERA_RESET)

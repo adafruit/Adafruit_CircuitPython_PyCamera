@@ -1,7 +1,3 @@
-
-
-
-
 import os
 import sys
 import time
@@ -37,9 +33,13 @@ while True:
 
     pycam.keys_debounce()
     # test shutter button
-    if pycam.shutter.fell:
-        print("Shutter pressed")
-
+    if pycam.shutter.long_press:
+        print("FOCUS")
+        print(pycam.autofocus_status)
+        pycam.autofocus()
+        print(pycam.autofocus_status)
+    if pycam.shutter.short_count:
+        print("Shutter released")
         if pycam.mode_text == "STOP":
             pycam.capture_into_bitmap(last_frame)
             pycam.stop_motion_frame += 1
@@ -98,9 +98,6 @@ while True:
             except RuntimeError as e:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
-    if pycam.shutter.rose:
-        print("Shutter released")
-
     if pycam.card_detect.fell:
         print("SD card removed")
         pycam.unmount_sd_card()
@@ -148,8 +145,5 @@ while True:
         #pycam.set_resolution(pycam.resolutions[new_res])
     if pycam.select.fell:
         print("SEL")
-        print(pycam.autofocus_status)
-        pycam.autofocus()
-        print(pycam.autofocus_status)
     if pycam.ok.fell:
         print("OK")
