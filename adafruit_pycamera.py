@@ -357,7 +357,7 @@ class PyCamera:
         return self.read_camera_register(_OV5640_CMD_FW_STATUS)
 
     def _print_focus_status(self, msg):
-        if True:
+        if False:
             print(f"{msg:36} status={self.autofocus_status:02x} busy?={self.read_camera_register(_OV5640_CMD_ACK):02x}")
 
     def _send_autofocus_command(self, command, msg):
