@@ -167,7 +167,7 @@ class PyCamera:
         self.deinit_display()
 
         self.splash = displayio.Group()
-        self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
+        self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=150, y=10, scale=2)
         self._effect_label = label.Label(terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2)
         self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
 
