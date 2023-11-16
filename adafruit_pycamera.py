@@ -366,14 +366,16 @@ class PyCamera:
         for _ in range(100):
             self._print_focus_status(msg)
             if self.read_camera_register(_OV5640_CMD_ACK) == 0x0: # command is finished
-                break
+                return True
             time.sleep(0.01)
         else:
-            raise RuntimeError(f"Timed out {msg}")
+            return False
 
     def autofocus(self) -> list[int]:
-        self._send_autofocus_command(_OV5640_CMD_RELEASE_FOCUS, "release focus")
-        self._send_autofocus_command(_OV5640_CMD_TRIGGER_AUTOFOCUS, "autofocus")
+        if not self._send_autofocus_command(_OV5640_CMD_RELEASE_FOCUS, "release focus"):
+            return [False] * 5
+        if not self._send_autofocus_command(_OV5640_CMD_TRIGGER_AUTOFOCUS, "autofocus"):
+            return [False] * 5
         zone_focus = [self.read_camera_register(_OV5640_CMD_PARA0 + i) for i in range(5)]
         print(f"zones focused: {zone_focus}")
         return zone_focus
