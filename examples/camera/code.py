@@ -9,11 +9,11 @@ import gifio
 import ulab.numpy as np
 import bitmaptools
 
-
 pycam = adafruit_pycamera.PyCamera()
+pycam.autofocus_init()
 #pycam.live_preview_mode()
 
-settings = (None, "resolution", "effect", "mode")
+settings = (None, "resolution", "effect", "mode", "led_level", "led_color")
 curr_setting = 0
 
 print("Starting!")
@@ -33,9 +33,13 @@ while True:
 
     pycam.keys_debounce()
     # test shutter button
-    if pycam.shutter.fell:
-        print("Shutter pressed")
-
+    if pycam.shutter.long_press:
+        print("FOCUS")
+        print(pycam.autofocus_status)
+        pycam.autofocus()
+        print(pycam.autofocus_status)
+    if pycam.shutter.short_count:
+        print("Shutter released")
         if pycam.mode_text == "STOP":
             pycam.capture_into_bitmap(last_frame)
             pycam.stop_motion_frame += 1
@@ -94,9 +98,6 @@ while True:
             except RuntimeError as e:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
-    if pycam.shutter.rose:
-        print("Shutter released")
-
     if pycam.card_detect.fell:
         print("SD card removed")
         pycam.unmount_sd_card()
@@ -110,8 +111,8 @@ while True:
                 pycam.mount_sd_card()
                 print("Success!")
                 break
-            except OSError:
-                print("Retrying!")
+            except OSError as e:
+                print("Retrying!", e)
                 time.sleep(0.5)
         else:
             pycam.display_message("SD Card\nFailed!", color=0xFF0000)
@@ -142,3 +143,7 @@ while True:
         pycam.select_setting(settings[curr_setting])
         #new_res = max(1, pycam.get_resolution()-1)
         #pycam.set_resolution(pycam.resolutions[new_res])
+    if pycam.select.fell:
+        print("SEL")
+    if pycam.ok.fell:
+        print("OK")

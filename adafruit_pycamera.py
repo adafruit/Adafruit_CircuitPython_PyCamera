@@ -4,7 +4,7 @@ import time
 import struct
 import board
 from digitalio import DigitalInOut, Direction, Pull
-from adafruit_debouncer import Debouncer
+from adafruit_debouncer import Debouncer, Button
 import bitmaptools
 import busio
 import adafruit_lis3dh
@@ -20,16 +20,52 @@ from adafruit_display_text import label
 import pwmio
 import microcontroller
 import adafruit_aw9523
-import espidf
+from adafruit_bus_device.i2c_device import I2CDevice
+from rainbowio import colorwheel
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
 
 from micropython import const
 
+_REG_DLY = const(0xFFFF)
 
+_OV5640_STAT_FIRMWAREBAD = const(0x7F)
+_OV5640_STAT_STARTUP = const(0x7E)
+_OV5640_STAT_IDLE = const(0x70)
+_OV5640_STAT_FOCUSING = const(0x00)
+_OV5640_STAT_FOCUSED = const(0x10)
+
+_OV5640_CMD_TRIGGER_AUTOFOCUS = const(0x03)
+_OV5640_CMD_AUTO_AUTOFOCUS = const(0x04)
+_OV5640_CMD_RELEASE_FOCUS = const(0x08)
+
+_OV5640_CMD_MAIN = const(0x3022)
+_OV5640_CMD_ACK = const(0x3023)
+_OV5640_CMD_PARA0 = const(0x3024)
+_OV5640_CMD_PARA1 = const(0x3025)
+_OV5640_CMD_PARA2 = const(0x3026)
+_OV5640_CMD_PARA3 = const(0x3027)
+_OV5640_CMD_PARA4 = const(0x3028)
+_OV5640_CMD_FW_STATUS = const(0x3029)
 
 class PyCamera:
+    _finalize_firmware_load = (
+            0x3022, 0x00,
+            0x3023, 0x00,
+            0x3024, 0x00,
+            0x3025, 0x00,
+            0x3026, 0x00,
+            0x3027, 0x00,
+            0x3028, 0x00,
+            0x3029, 0x7f,
+            0x3000, 0x00,
+    )
+    led_levels = [0., .1, .2, .5, 1.]
+
+    colors = [0xffffff, 0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff,
+        [colorwheel(i*(256//8)) for i in range(8)]]
+
     resolutions = (
         #"160x120",
         #"176x144",
@@ -125,31 +161,70 @@ class PyCamera:
     
 
     def __init__(self) -> None:
-        if espidf.get_reserved_psram() < 1024 * 512:
-            raise RuntimeError("Please reserve at least 512kB of PSRAM!")
-        
         self.t = time.monotonic()
         self._i2c = board.I2C()
         self._spi = board.SPI()
         self.deinit_display()
 
         self.splash = displayio.Group()
-        self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=180, y=10, scale=2)
+        self._sd_label = label.Label(terminalio.FONT, text="SD ??", color=0x0, x=150, y=10, scale=2)
         self._effect_label = label.Label(terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2)
         self._mode_label = label.Label(terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2)
+
+        # turn on the display first, its reset line may be shared with the IO expander(?)
+        if not self.display:
+            self.init_display()
+
+        self.shutter_button = DigitalInOut(board.BUTTON)
+        self.shutter_button.switch_to_input(Pull.UP)
+        self.shutter = Button(self.shutter_button)
+
+        print("reset camera")
+        self._cam_reset = DigitalInOut(board.CAMERA_RESET)
+        self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
+
+        self._cam_reset.switch_to_output(False)
+        self._cam_pwdn.switch_to_output(True)
+        time.sleep(0.01)
+        self._cam_pwdn.switch_to_output(False)
+        time.sleep(0.01)
+        self._cam_reset.switch_to_output(True)
+        time.sleep(0.01)
+
+        print("pre cam @", time.monotonic()-self.t)
+        self.i2c_scan()
 
         # AW9523 GPIO expander
         self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x58)
         print("Found AW9523")
-        
-        self.carddet_pin = self._aw.get_pin(_AW_CARDDET)
-        self.card_detect = Debouncer(self.carddet_pin)
-        
-        self._card_power = self._aw.get_pin(_AW_SDPWR)
-        self._card_power.switch_to_output(True)
 
-        self.mute = self._aw.get_pin(_AW_MUTE)
-        self.mute.switch_to_output(False)
+        def make_expander_input(pin_no):
+            pin = self._aw.get_pin(pin_no)
+            pin.switch_to_input()
+            return pin
+
+        def make_expander_output(pin_no, value):
+            pin = self._aw.get_pin(pin_no)
+            pin.switch_to_output(value)
+            return pin
+
+        def make_debounced_expander_pin(pin_no):
+            pin = self._aw.get_pin(pin_no)
+            pin.switch_to_input()
+            return Debouncer(make_expander_input(pin_no))
+
+
+        self.up = make_debounced_expander_pin(_AW_UP)
+        self.left = make_debounced_expander_pin(_AW_LEFT)
+        self.right = make_debounced_expander_pin(_AW_RIGHT)
+        self.down = make_debounced_expander_pin(_AW_DOWN)
+        self.select = make_debounced_expander_pin(_AW_SELECT)
+        self.ok = make_debounced_expander_pin(_AW_OK)
+        self.card_detect = make_debounced_expander_pin(_AW_CARDDET)
+        
+        self._card_power = make_expander_output(_AW_SDPWR, True)
+
+        self.mute = make_expander_input(_AW_MUTE)
 
         self.sdcard = None
         try:
@@ -162,24 +237,14 @@ class PyCamera:
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
         self.accel.range = adafruit_lis3dh.RANGE_2_G
 
-        # built in neopixels
+        # main board neopixel
         neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
         neopix.fill(0)
-        
-        # camera!
-        self._cam_reset = DigitalInOut(board.CAMERA_RESET)
-        self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
+        neopix.deinit()
 
-        self._cam_reset.switch_to_output(False)
-        self._cam_pwdn.switch_to_output(True)
-        time.sleep(0.01)
-        self._cam_pwdn.switch_to_output(False)
-        time.sleep(0.01)
-        self._cam_reset.switch_to_output(True)
-        time.sleep(0.01)
-        
-        print("pre cam @", time.monotonic()-self.t)
-        self.i2c_scan()
+        # front bezel neopixels
+        self.pixels = neopixel.NeoPixel(board.A1, 8, brightness=0.1, pixel_order=neopixel.RGBW)
+        self.pixels.fill(0)
 
         print("Initializing camera")
         self.camera = espcamera.Camera(
@@ -194,35 +259,15 @@ class PyCamera:
             external_clock_frequency=20_000_000,
             framebuffer_count=2)
         
-        print("Found camera %s (%d x %d)" % (self.camera.sensor_name, self.camera.width, self.camera.height))
+        print("Found camera %s (%d x %d) at I2C address %02x" % (self.camera.sensor_name, self.camera.width, self.camera.height, self.camera.address))
         print("camera done @", time.monotonic()-self.t)
         print(dir(self.camera))
 
+        self._camera_device = I2CDevice(self._i2c, self.camera.address)
         #display.auto_refresh = False
 
         self.camera.hmirror = True
         self.camera.vflip = True
-
-        # action!
-        if not self.display:
-            self.init_display()
-        
-        self.shutter_button = DigitalInOut(board.BUTTON)
-        self.shutter_button.switch_to_input(Pull.UP)
-        self.shutter = Debouncer(self.shutter_button)
-
-        self.up_pin = self._aw.get_pin(_AW_UP)
-        self.up_pin.switch_to_input()
-        self.up = Debouncer(self.up_pin)
-        self.down_pin = self._aw.get_pin(_AW_DOWN)
-        self.down_pin.switch_to_input()
-        self.down = Debouncer(self.down_pin)
-        self.left_pin = self._aw.get_pin(_AW_LEFT)
-        self.left_pin.switch_to_input()
-        self.left = Debouncer(self.left_pin)
-        self.right_pin = self._aw.get_pin(_AW_RIGHT)
-        self.right_pin.switch_to_input()
-        self.right = Debouncer(self.right_pin)
 
         self._bigbuf = None
 
@@ -240,6 +285,9 @@ class PyCamera:
         self.display.root_group = self.splash
         self.display.refresh()
 
+        self.led_color = 0
+        self.led_level = 0
+
         #self.camera.colorbar = True
         self.effect = microcontroller.nvm[_NVM_EFFECT]
         self.camera.saturation = 3
@@ -247,23 +295,116 @@ class PyCamera:
         self.mode = microcontroller.nvm[_NVM_MODE]
         print("init done @", time.monotonic()-self.t)
 
+    def autofocus_init_from_file(self, filename):
+        with open(filename, mode='rb') as file:
+            firmware = file.read()
+        self.autofocus_init_from_bitstream(firmware)
+
+    def write_camera_register(self, reg: int, value: int) -> None:
+        b = bytearray(3)
+        b[0] = reg >> 8
+        b[1] = reg & 0xFF
+        b[2] = value
+        with self._camera_device as i2c:
+            i2c.write(b)
+
+    def write_camera_list(self, reg_list: Sequence[int]) -> None:
+        for i in range(0, len(reg_list), 2):
+            register = reg_list[i]
+            value = reg_list[i + 1]
+            if register == _REG_DLY:
+                time.sleep(value / 1000)
+            else:
+                self.write_camera_register(register, value)
+
+    def read_camera_register(self, reg: int) -> int:
+        b = bytearray(2)
+        b[0] = reg >> 8
+        b[1] = reg & 0xFF
+        with self._camera_device as i2c:
+            i2c.write(b)
+            i2c.readinto(b, end=1)
+        return b[0]
+
+    def autofocus_init_from_bitstream(self, firmware):
+        if self.camera.sensor_name != "OV5640":
+            raise RuntimeError(f"Autofocus not supported on {self.camera.sensor_name}")
+
+        self.write_camera_register(0x3000, 0x20) # reset autofocus coprocessor
+
+        for addr, val in enumerate(firmware):
+            self.write_camera_register(0x8000+addr, val)
+
+        self.write_camera_list(self._finalize_firmware_load)
+        for _ in range(100):
+            self._print_focus_status("init from bitstream")
+            if self.autofocus_status == _OV5640_STAT_IDLE:
+                break
+            time.sleep(0.01)
+        else:
+            raise RuntimeError("Timed out after trying to load autofocus firmware")
+
+    def autofocus_init(self):
+        if '/' in __file__:
+            binfile = __file__.rsplit("/", 1)[0].rsplit(".", 1)[0] + "/ov5640_autofocus.bin"
+        else:
+            binfile = "ov5640_autofocus.bin"
+        print(binfile)
+        return self.autofocus_init_from_file(binfile)
+
+    @property
+    def autofocus_status(self):
+        return self.read_camera_register(_OV5640_CMD_FW_STATUS)
+
+    def _print_focus_status(self, msg):
+        if False:
+            print(f"{msg:36} status={self.autofocus_status:02x} busy?={self.read_camera_register(_OV5640_CMD_ACK):02x}")
+
+    def _send_autofocus_command(self, command, msg):
+        self.write_camera_register(_OV5640_CMD_ACK, 0x01) # clear command ack
+        self.write_camera_register(_OV5640_CMD_MAIN, command) # send command
+        for _ in range(100):
+            self._print_focus_status(msg)
+            if self.read_camera_register(_OV5640_CMD_ACK) == 0x0: # command is finished
+                return True
+            time.sleep(0.01)
+        else:
+            return False
+
+    def autofocus(self) -> list[int]:
+        if not self._send_autofocus_command(_OV5640_CMD_RELEASE_FOCUS, "release focus"):
+            return [False] * 5
+        if not self._send_autofocus_command(_OV5640_CMD_TRIGGER_AUTOFOCUS, "autofocus"):
+            return [False] * 5
+        zone_focus = [self.read_camera_register(_OV5640_CMD_PARA0 + i) for i in range(5)]
+        print(f"zones focused: {zone_focus}")
+        return zone_focus
+
     def select_setting(self, setting_name):
         self._effect_label.color = 0xFFFFFF
         self._effect_label.background_color = 0x0
         self._res_label.color = 0xFFFFFF
         self._res_label.background_color = 0x0
+        self._res_label.text = self.resolutions[self._resolution]
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
         if setting_name == "effect":
             self._effect_label.color = 0x0
             self._effect_label.background_color = 0xFFFFFF
-        if setting_name == "resolution":
+        elif setting_name == "resolution":
             self._res_label.color = 0x0
             self._res_label.background_color = 0xFFFFFF
-        if setting_name == "mode":
+        elif setting_name == "mode":
             self._mode_label.color = 0x0
             self._mode_label.background_color = 0xFFFFFF
-
+        elif setting_name == "led_level":
+            self._res_label.text = "LED LV"
+            self._res_label.color = 0x0
+            self._res_label.background_color = 0xFFFFFF
+        elif setting_name == "led_color":
+            self._res_label.text = "LED CLR"
+            self._res_label.color = 0x0
+            self._res_label.background_color = 0xFFFFFF
         self.display.refresh()
 
     @property
@@ -405,11 +546,13 @@ class PyCamera:
     def keys_debounce(self):
         # shutter button is true GPIO so we debounce as normal
         self.shutter.update()
-        self.card_detect.update(self.carddet_pin.value)
-        self.up.update(self.up_pin.value)
-        self.down.update(self.down_pin.value)
-        self.left.update(self.left_pin.value)
-        self.right.update(self.right_pin.value)
+        self.card_detect.update()
+        self.up.update()
+        self.down.update()
+        self.left.update()
+        self.right.update()
+        self.select.update()
+        self.ok.update()
 
     def tone(self, frequency, duration=0.1):
         with pwmio.PWMOut(
@@ -486,3 +629,28 @@ class PyCamera:
                                                32 + bitmap.height - 1))
         self._display_bus.send(44, bitmap)
 
+    @property
+    def led_level(self):
+        return self._led_level
+
+    @led_level.setter
+    def led_level(self, new_level):
+        level = (new_level + len(self.led_levels)) % len(self.led_levels)
+        self._led_level = level
+        self.pixels.brightness = self.led_levels[level]
+        self.led_color = self.led_color
+
+    @property
+    def led_color(self):
+        return self._led_color
+
+    @led_color.setter
+    def led_color(self, new_color):
+        color = (new_color + len(self.colors)) % len(self.colors)
+        self._led_color = color
+        colors = self.colors[color]
+        print("colors", colors)
+        if isinstance(colors, int):
+            self.pixels.fill(colors)
+        else:
+            self.pixels[:] = colors
