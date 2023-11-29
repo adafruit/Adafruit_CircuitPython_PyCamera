@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
+#
+# SPDX-License-Identifier: Unlicense
+
 import json
 
 

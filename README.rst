@@ -46,33 +46,10 @@ image from the assets folder in the PCB's GitHub repo.
 
 Installing from PyPI
 =====================
-.. note:: This library is not available on PyPI yet. Install documentation is included
-   as a standard element. Stay tuned for PyPI availability!
 
-.. todo:: Remove the above note if PyPI version is/will be available at time of release.
-
-On supported GNU/Linux systems like the Raspberry Pi, you can install the driver locally `from
-PyPI <https://pypi.org/project/adafruit-circuitpython-pycamera/>`_.
-To install for current user:
-
-.. code-block:: shell
-
-    pip3 install adafruit-circuitpython-pycamera
-
-To install system-wide (this may be required in some cases):
-
-.. code-block:: shell
-
-    sudo pip3 install adafruit-circuitpython-pycamera
-
-To install in a virtual environment in your current project:
-
-.. code-block:: shell
-
-    mkdir project-name && cd project-name
-    python3 -m venv .venv
-    source .env/bin/activate
-    pip3 install adafruit-circuitpython-pycamera
+This package is available on PyPI so that it can be installed by Thonny. It is
+not useful to install this package from PyPI on a Windows, Mac, or Linux
+computer.
 
 Installing to a Connected CircuitPython Device with Circup
 ==========================================================
@@ -100,8 +77,15 @@ Or the following command to update an existing version:
 Usage Example
 =============
 
-.. todo:: Add a quick, simple example. It and other examples should live in the
-examples folder and be included in docs/examples.rst.
+.. code-block: python
+
+    from adafruit_pycamera import PyCamera
+
+    pycam = PyCamera()
+
+    while True:
+        new_frame = pycam.continuous_capture()
+        # .. do something with new_frame
 
 Documentation
 =============
