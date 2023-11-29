@@ -33,7 +33,7 @@ metadata = {
         "led_color": list_range(8),
     },
     "property2": {
-        "sensor_name": None,
+        #"sensor_name": None,
         "contrast": list_range(-2, 3),
         "brightness": list_range(-2, 3),
         "saturation": list_range(-2, 3),
@@ -61,5 +61,7 @@ metadata = {
     },
 }
 
-with open("metadata.json", "w", encoding="utf-8") as f:
-    json.dump(metadata, f)
+with open("htdocs/metadata.js", "w", encoding="utf-8") as f:
+    print(end="tunables = ", file=f)
+    json.dump(metadata, f, indent=4)
+    print(";", file=f)

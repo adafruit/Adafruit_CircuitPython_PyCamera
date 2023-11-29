@@ -16,6 +16,11 @@ import wifi
 from adafruit_httpserver import (BAD_REQUEST_400, GET, NOT_FOUND_404, POST, FileResponse,
                                  JSONResponse, Request, Response, Server)
 
+# Disable autoreload. this is very handy while editing the js & html files
+# as you want to just reload the web browser, not the CircutPython program!
+import supervisor
+supervisor.runtime.autoreload = False
+
 pycam = adafruit_pycamera.PyCamera()
 pycam.autofocus_init()
 
@@ -34,7 +39,7 @@ server = Server(pool, debug=True, root_path='/htdocs')
 
 @server.route("/metadata.json", [GET])
 def property(request: Request) -> Response:
-    return FileResponse(request, "/metadata.json")
+    return FileResponse(request, "/metadata.js")
 
 @server.route("/", [GET])
 def property(request: Request) -> Response:
