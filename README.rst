@@ -39,10 +39,8 @@ or individual libraries can be installed using
 
 
 
-.. todo:: Describe the Adafruit product this library works with. For PCBs, you can also add the
-image from the assets folder in the PCB's GitHub repo.
-
-`Purchase one from the Adafruit shop <http://www.adafruit.com/products/9999>`_
+.. ::
+    `Purchase one from the Adafruit shop <http://www.adafruit.com/products/9999>`_
 
 Installing from PyPI
 =====================
