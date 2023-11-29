@@ -1,16 +1,18 @@
+# SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
+#
+# SPDX-License-Identifier: Unlicense
+
 import asyncio
 import binascii
 import os
-import struct
-import sys
-import time
 
-import adafruit_pycamera
 import espcamera
 import socketpool
 import wifi
 from adafruit_httpserver.response import ChunkedResponse
 from adafruit_httpserver.server import Server
+
+import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.camera.reconfigure(
@@ -61,6 +63,7 @@ async def poll(interval):
 async def main():
     poll_task = asyncio.create_task(poll(0))
     await asyncio.gather(poll_task)
+
 
 pycam.display_message(f"{wifi.radio.ipv4_address}:{PORT}/", scale=2)
 
