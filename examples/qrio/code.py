@@ -11,13 +11,9 @@ ILI9341 display.
 import time
 
 import bitmaptools
-import board
-import busio
 import displayio
 import espcamera
 import qrio
-from adafruit_display_text.bitmap_label import Label
-from terminalio import FONT
 
 from adafruit_pycamera import PyCamera
 
@@ -27,8 +23,8 @@ pycam.camera.reconfigure(
     pixel_format=espcamera.PixelFormat.RGB565,
     frame_size=espcamera.FrameSize.VGA,
 )
-pycam._mode_label.text = "QR SCAN"
-pycam._res_label.text = ""
+pycam._mode_label.text = "QR SCAN"  # pylint: disable=protected-access
+pycam._res_label.text = ""  # pylint: disable=protected-access
 pycam.effect = 0
 pycam.display.refresh()
 qrdecoder = qrio.QRDecoder(zoomed.width, zoomed.height)

@@ -1,17 +1,21 @@
 # SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
+"""Library for the Adafruit PyCamera with OV5640 autofocus module"""
 
 import os
 import struct
-import sys
 import time
+
+try:
+    from typing import Sequence
+except ImportError:
+    pass
 
 import adafruit_aw9523
 import adafruit_lis3dh
 import bitmaptools
 import board
-import busio
 import displayio
 import espcamera
 import microcontroller
@@ -23,8 +27,7 @@ import terminalio
 from adafruit_bus_device.i2c_device import I2CDevice
 from adafruit_debouncer import Button, Debouncer
 from adafruit_display_text import label
-from adafruit_st7789 import ST7789
-from digitalio import DigitalInOut, Direction, Pull
+from digitalio import DigitalInOut, Pull
 from rainbowio import colorwheel
 
 __version__ = "0.0.0-auto.0"
@@ -53,8 +56,30 @@ _OV5640_CMD_PARA3 = const(0x3027)
 _OV5640_CMD_PARA4 = const(0x3028)
 _OV5640_CMD_FW_STATUS = const(0x3029)
 
+_AW_MUTE = const(0)
+_AW_SELECT = const(1)
+_AW_CARDDET = const(8)
+_AW_SDPWR = const(9)
+_AW_DOWN = const(15)
+_AW_LEFT = const(14)
+_AW_UP = const(13)
+_AW_RIGHT = const(12)
+_AW_OK = const(11)
+# _SS_ALL_BUTTONS_MASK = const(0b000010000000001011100)
+# _SS_DOWN_MASK = const(0x10000)
+# _SS_LEFT_MASK = const(0x00004)
+# _SS_UP_MASK = const(0x00008)
+# _SS_RIGHT_MASK = const(0x00040)
+# _SS_CARDDET_MASK = const(0x00010)
 
-class PyCamera:
+_NVM_RESOLUTION = const(1)
+_NVM_EFFECT = const(2)
+_NVM_MODE = const(3)
+
+
+class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
+    """Wrapper class for the PyCamera hardware"""
+
     _finalize_firmware_load = (
         0x3022,
         0x00,
@@ -149,26 +174,6 @@ class PyCamera:
     )
     modes = ("JPEG", "GIF", "STOP")
 
-    _AW_MUTE = const(0)
-    _AW_SELECT = const(1)
-    _AW_CARDDET = const(8)
-    _AW_SDPWR = const(9)
-    _AW_DOWN = const(15)
-    _AW_LEFT = const(14)
-    _AW_UP = const(13)
-    _AW_RIGHT = const(12)
-    _AW_OK = const(11)
-    # _SS_ALL_BUTTONS_MASK = const(0b000010000000001011100)
-    # _SS_DOWN_MASK = const(0x10000)
-    # _SS_LEFT_MASK = const(0x00004)
-    # _SS_UP_MASK = const(0x00008)
-    # _SS_RIGHT_MASK = const(0x00040)
-    # _SS_CARDDET_MASK = const(0x00010)
-
-    _NVM_RESOLUTION = const(1)
-    _NVM_EFFECT = const(2)
-    _NVM_MODE = const(3)
-
     _INIT_SEQUENCE = (
         b"\x01\x80\x78"  # _SWRESET and Delay 120ms
         b"\x11\x80\x05"  # _SLPOUT and Delay 5ms
@@ -180,6 +185,7 @@ class PyCamera:
     )
 
     def i2c_scan(self):
+        """Print an I2C bus scan"""
         while not self._i2c.try_lock():
             pass
 
@@ -191,8 +197,8 @@ class PyCamera:
         finally:  # unlock the i2c bus when ctrl-c'ing out of the loop
             self._i2c.unlock()
 
-    def __init__(self) -> None:
-        self.t = time.monotonic()
+    def __init__(self) -> None:  # pylint: disable=too-many-statements
+        self._timestamp = time.monotonic()
         self._i2c = board.I2C()
         self._spi = board.SPI()
         self.deinit_display()
@@ -228,7 +234,7 @@ class PyCamera:
         self._cam_reset.switch_to_output(True)
         time.sleep(0.01)
 
-        print("pre cam @", time.monotonic() - self.t)
+        print("pre cam @", time.monotonic() - self._timestamp)
         self.i2c_scan()
 
         # AW9523 GPIO expander
@@ -250,7 +256,7 @@ class PyCamera:
             pin.switch_to_input()
             return Debouncer(make_expander_input(pin_no))
 
-        self.up = make_debounced_expander_pin(_AW_UP)
+        self.up = make_debounced_expander_pin(_AW_UP)  # pylint: disable=invalid-name
         self.left = make_debounced_expander_pin(_AW_LEFT)
         self.right = make_debounced_expander_pin(_AW_RIGHT)
         self.down = make_debounced_expander_pin(_AW_DOWN)
@@ -267,7 +273,7 @@ class PyCamera:
             self.mount_sd_card()
         except RuntimeError:
             pass  # no card found, its ok!
-        print("sdcard done @", time.monotonic() - self.t)
+        print("sdcard done @", time.monotonic() - self._timestamp)
 
         # lis3dh accelerometer
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
@@ -307,7 +313,7 @@ class PyCamera:
                 self.camera.address,
             )
         )
-        print("camera done @", time.monotonic() - self.t)
+        print("camera done @", time.monotonic() - self._timestamp)
         print(dir(self.camera))
 
         self._camera_device = I2CDevice(self._i2c, self.camera.address)
@@ -342,14 +348,16 @@ class PyCamera:
         self.camera.saturation = 3
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
-        print("init done @", time.monotonic() - self.t)
+        print("init done @", time.monotonic() - self._timestamp)
 
     def autofocus_init_from_file(self, filename):
+        """Initialize the autofocus engine from a .bin file"""
         with open(filename, mode="rb") as file:
             firmware = file.read()
         self.autofocus_init_from_bitstream(firmware)
 
     def write_camera_register(self, reg: int, value: int) -> None:
+        """Write a 1-byte camera register"""
         b = bytearray(3)
         b[0] = reg >> 8
         b[1] = reg & 0xFF
@@ -358,6 +366,7 @@ class PyCamera:
             i2c.write(b)
 
     def write_camera_list(self, reg_list: Sequence[int]) -> None:
+        """Write a series of 1-byte camera registers"""
         for i in range(0, len(reg_list), 2):
             register = reg_list[i]
             value = reg_list[i + 1]
@@ -367,6 +376,7 @@ class PyCamera:
                 self.write_camera_register(register, value)
 
     def read_camera_register(self, reg: int) -> int:
+        """Read a 1-byte camera register"""
         b = bytearray(2)
         b[0] = reg >> 8
         b[1] = reg & 0xFF
@@ -375,7 +385,8 @@ class PyCamera:
             i2c.readinto(b, end=1)
         return b[0]
 
-    def autofocus_init_from_bitstream(self, firmware):
+    def autofocus_init_from_bitstream(self, firmware: bytes):
+        """Initialize the autofocus engine from a bytestring"""
         if self.camera.sensor_name != "OV5640":
             raise RuntimeError(f"Autofocus not supported on {self.camera.sensor_name}")
 
@@ -386,7 +397,6 @@ class PyCamera:
 
         self.write_camera_list(self._finalize_firmware_load)
         for _ in range(100):
-            self._print_focus_status("init from bitstream")
             if self.autofocus_status == _OV5640_STAT_IDLE:
                 break
             time.sleep(0.01)
@@ -394,6 +404,7 @@ class PyCamera:
             raise RuntimeError("Timed out after trying to load autofocus firmware")
 
     def autofocus_init(self):
+        """Initialize the autofocus engine from ov5640_autofocus.bin"""
         if "/" in __file__:
             binfile = (
                 __file__.rsplit("/", 1)[0].rsplit(".", 1)[0] + "/ov5640_autofocus.bin"
@@ -405,26 +416,25 @@ class PyCamera:
 
     @property
     def autofocus_status(self):
+        """Read the camera autofocus status register"""
         return self.read_camera_register(_OV5640_CMD_FW_STATUS)
 
-    def _print_focus_status(self, msg):
-        if False:
-            print(
-                f"{msg:36} status={self.autofocus_status:02x} busy?={self.read_camera_register(_OV5640_CMD_ACK):02x}"
-            )
-
-    def _send_autofocus_command(self, command, msg):
+    def _send_autofocus_command(self, command, msg):  # pylint: disable=unused-argument
         self.write_camera_register(_OV5640_CMD_ACK, 0x01)  # clear command ack
         self.write_camera_register(_OV5640_CMD_MAIN, command)  # send command
         for _ in range(100):
-            self._print_focus_status(msg)
             if self.read_camera_register(_OV5640_CMD_ACK) == 0x0:  # command is finished
                 return True
             time.sleep(0.01)
-        else:
-            return False
+        return False
 
     def autofocus(self) -> list[int]:
+        """Perform an autofocus operation.
+
+        If all elements of the list are 0, the autofocus operation failed. Otherwise,
+        if at least one element is nonzero, the operation succeeded.
+
+        In principle the elements correspond to 5 autofocus regions, if configured."""
         if not self._send_autofocus_command(_OV5640_CMD_RELEASE_FOCUS, "release focus"):
             return [False] * 5
         if not self._send_autofocus_command(_OV5640_CMD_TRIGGER_AUTOFOCUS, "autofocus"):
@@ -436,6 +446,7 @@ class PyCamera:
         return zone_focus
 
     def select_setting(self, setting_name):
+        """For the point & shoot camera mode, control what setting is being set"""
         self._effect_label.color = 0xFFFFFF
         self._effect_label.background_color = 0x0
         self._res_label.color = 0xFFFFFF
@@ -464,10 +475,12 @@ class PyCamera:
 
     @property
     def mode(self):
+        """Get or set the capture mode (e.g., JPEG, etc) as a numeric constant"""
         return self._mode
 
     @property
     def mode_text(self):
+        """Get the capture mode (e.g., JPEG, etc) as a human string"""
         return self.modes[self._mode]
 
     @mode.setter
@@ -486,6 +499,7 @@ class PyCamera:
 
     @property
     def effect(self):
+        """Get or set the effect mode (e.g., B&W, etc) as a numeric constant"""
         return self._effect
 
     @effect.setter
@@ -499,6 +513,9 @@ class PyCamera:
 
     @property
     def resolution(self):
+        """Get or set the resolution as a numeric constant
+
+        The resolution can also be set as a string such as "240x240"."""
         return self._resolution
 
     @resolution.setter
@@ -515,6 +532,7 @@ class PyCamera:
         self.display.refresh()
 
     def init_display(self):
+        """Initialize the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
         self._display_bus = displayio.FourWire(
@@ -538,12 +556,14 @@ class PyCamera:
         self.display.refresh()
 
     def deinit_display(self):
+        """Release the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
         self._display_bus = None
         self.display = None
 
     def display_message(self, message, color=0xFF0000, scale=3):
+        """Display a message on the TFT"""
         text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
         text_area.anchor_point = (0.5, 0.5)
         if not self.display:
@@ -556,6 +576,7 @@ class PyCamera:
         self.splash.pop()
 
     def mount_sd_card(self):
+        """Attempt to mount the SD card"""
         self._sd_label.text = "NO SD"
         self._sd_label.color = 0xFF0000
         if not self.card_detect.value:
@@ -585,10 +606,10 @@ class PyCamera:
         # power SD card
         self._card_power.value = False
         card_cs.deinit()
-        print("sdcard init @", time.monotonic() - self.t)
+        print("sdcard init @", time.monotonic() - self._timestamp)
         self.sdcard = sdcardio.SDCard(self._spi, board.CARD_CS, baudrate=20_000_000)
         vfs = storage.VfsFat(self.sdcard)
-        print("mount vfs @", time.monotonic() - self.t)
+        print("mount vfs @", time.monotonic() - self._timestamp)
         storage.mount(vfs, "/sd")
         self.init_display()
         self._image_counter = 0
@@ -596,6 +617,7 @@ class PyCamera:
         self._sd_label.color = 0x00FF00
 
     def unmount_sd_card(self):
+        """Unmount the SD card, if mounted"""
         try:
             storage.umount("/sd")
         except OSError:
@@ -604,6 +626,10 @@ class PyCamera:
         self._sd_label.color = 0xFF0000
 
     def keys_debounce(self):
+        """Debounce all keys.
+
+        This updates the values of self.shutter, etc., buttons"""
+
         # shutter button is true GPIO so we debounce as normal
         self.shutter.update()
         self.card_detect.update()
@@ -615,6 +641,7 @@ class PyCamera:
         self.ok.update()
 
     def tone(self, frequency, duration=0.1):
+        """Play a tone on the internal speaker"""
         with pwmio.PWMOut(
             board.SPEAKER, frequency=int(frequency), variable_frequency=False
         ) as pwm:
@@ -624,6 +651,7 @@ class PyCamera:
             self.mute.value = False
 
     def live_preview_mode(self):
+        """Set the camera into live preview mode"""
         self.camera.reconfigure(
             pixel_format=espcamera.PixelFormat.RGB565,
             frame_size=espcamera.FrameSize.HQVGA,
@@ -632,10 +660,11 @@ class PyCamera:
         self.continuous_capture_start()
 
     def open_next_image(self, extension="jpg"):
+        """Return an opened numbered file on the sdcard, such as "img01234.jpg"."""
         try:
             os.stat("/sd")
-        except OSError:  # no SD card!
-            raise RuntimeError("No SD card mounted")
+        except OSError as exc:  # no SD card!
+            raise RuntimeError("No SD card mounted") from exc
         while True:
             filename = "/sd/img%04d.%s" % (self._image_counter, extension)
             self._image_counter += 1
@@ -647,10 +676,11 @@ class PyCamera:
         return open(filename, "wb")
 
     def capture_jpeg(self):
+        """Capture a jpeg file and save it to the SD card"""
         try:
             os.stat("/sd")
-        except OSError:  # no SD card!
-            raise RuntimeError("No SD card mounted")
+        except OSError as exc:  # no SD card!
+            raise RuntimeError("No SD card mounted") from exc
 
         self.camera.reconfigure(
             pixel_format=espcamera.PixelFormat.JPEG,
@@ -663,32 +693,48 @@ class PyCamera:
             print(f"Captured {len(jpeg)} bytes of jpeg data")
             print("Resolution %d x %d" % (self.camera.width, self.camera.height))
 
-            with self.open_next_image() as f:
+            with self.open_next_image() as dest:
                 chunksize = 16384
                 for offset in range(0, len(jpeg), chunksize):
-                    f.write(jpeg[offset : offset + chunksize])
+                    dest.write(jpeg[offset : offset + chunksize])
                     print(end=".")
             print("# Wrote image")
         else:
             print("# frame capture failed")
 
     def continuous_capture_start(self):
-        self._bitmap1 = self.camera.take(1)
+        """Switch the camera to continuous-capture mode"""
+        pass  # pylint: disable=unnecessary-pass
 
     def capture_into_bitmap(self, bitmap):
-        self._bitmap1 = self.camera.take(1)
-        bitmaptools.blit(bitmap, self._bitmap1, 0, 0)
+        """Capture an image and blit it into the given bitmap"""
+        bitmaptools.blit(bitmap, self.continuous_capture(), 0, 0)
 
     def continuous_capture(self):
+        """Capture an image into an internal buffer.
+
+        The image is valid at least until the next image capture,
+        or the camera's capture mode is changed"""
         return self.camera.take(1)
 
     def blit(self, bitmap):
+        """Display a bitmap direct to the LCD, bypassing displayio
+
+        This can be more efficient than displaying a bitmap as a displayio
+        TileGrid, but if any displayio objects overlap the bitmap, the results
+        can be unpredictable.
+
+        The default preview capture is 240x176, leaving 32 pixel rows at the top and bottom
+        for status information.
+        """
+
         self._display_bus.send(42, struct.pack(">hh", 80, 80 + bitmap.width - 1))
         self._display_bus.send(43, struct.pack(">hh", 32, 32 + bitmap.height - 1))
         self._display_bus.send(44, bitmap)
 
     @property
     def led_level(self):
+        """Get or set the LED level, from 0 to 4"""
         return self._led_level
 
     @led_level.setter
@@ -700,6 +746,7 @@ class PyCamera:
 
     @property
     def led_color(self):
+        """Get or set the LED color, from 0 to 7"""
         return self._led_color
 
     @led_color.setter

@@ -5,9 +5,6 @@
 import asyncio
 import binascii
 import os
-import struct
-import sys
-import time
 
 import espcamera
 import socketpool

@@ -2,13 +2,9 @@
 #
 # SPDX-License-Identifier: Unlicense
 
-import os
-import struct
-import sys
 import time
 
 import bitmaptools
-import board
 import displayio
 import gifio
 import ulab.numpy as np
@@ -70,7 +66,7 @@ while True:
                 continue
             i = 0
             ft = []
-            pycam._mode_label.text = "RECORDING"
+            pycam._mode_label.text = "RECORDING"  # pylint: disable=protected-access
 
             pycam.display.refresh()
             with gifio.GifWriter(
@@ -81,7 +77,7 @@ while True:
                 dither=True,
             ) as g:
                 t00 = t0 = time.monotonic()
-                while (i < 15) or (pycam.shutter_button.value == False):
+                while (i < 15) or not pycam.shutter_button.value:
                     i += 1
                     _gifframe = pycam.continuous_capture()
                     g.add_frame(_gifframe, 0.12)
@@ -90,7 +86,7 @@ while True:
                     ft.append(1 / (t1 - t0))
                     print(end=".")
                     t0 = t1
-            pycam._mode_label.text = "GIF"
+            pycam._mode_label.text = "GIF"  # pylint: disable=protected-access
             print(f"\nfinal size {f.tell()} for {i} frames")
             print(f"average framerate {i/(t1-t00)}fps")
             print(f"best {max(ft)} worst {min(ft)} std. deviation {np.std(ft)}")
