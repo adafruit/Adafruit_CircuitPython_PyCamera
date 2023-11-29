@@ -13,12 +13,22 @@ import gifio
 import socketpool
 import ulab.numpy as np
 import wifi
-from adafruit_httpserver import (BAD_REQUEST_400, GET, NOT_FOUND_404, POST, FileResponse,
-                                 JSONResponse, Request, Response, Server)
+from adafruit_httpserver import (
+    BAD_REQUEST_400,
+    GET,
+    NOT_FOUND_404,
+    POST,
+    FileResponse,
+    JSONResponse,
+    Request,
+    Response,
+    Server,
+)
 
 # Disable autoreload. this is very handy while editing the js & html files
 # as you want to just reload the web browser, not the CircutPython program!
 import supervisor
+
 supervisor.runtime.autoreload = False
 
 pycam = adafruit_pycamera.PyCamera()
@@ -35,15 +45,18 @@ else:
 print(wifi.radio.ipv4_address)
 
 pool = socketpool.SocketPool(wifi.radio)
-server = Server(pool, debug=True, root_path='/htdocs')
+server = Server(pool, debug=True, root_path="/htdocs")
+
 
 @server.route("/metadata.json", [GET])
 def property(request: Request) -> Response:
     return FileResponse(request, "/metadata.js")
 
+
 @server.route("/", [GET])
 def property(request: Request) -> Response:
     return FileResponse(request, "/index.html")
+
 
 @server.route("/index.js", [GET])
 def property(request: Request) -> Response:
@@ -73,9 +86,11 @@ def property(request: Request) -> Response:
     finally:
         pycam.live_preview_mode()
 
+
 @server.route("/focus", [GET])
 def focus(request: Request) -> Response:
     return JSONResponse(request, pycam.autofocus())
+
 
 @server.route("/property", [GET, POST])
 def property(request: Request) -> Response:
@@ -98,13 +113,13 @@ def property_common(obj, request):
                 current_value = getattr(obj, key, None)
                 return JSONResponse(request, current_value)
             except Exception as e:
-                return Response(request, {'error': str(e)}, status=BAD_REQUEST_400)
+                return Response(request, {"error": str(e)}, status=BAD_REQUEST_400)
         else:
             new_value = json.loads(value)
             setattr(obj, key, new_value)
-            return JSONResponse(request, {'status': 'OK'})
+            return JSONResponse(request, {"status": "OK"})
     except Exception as e:
-        return JSONResponse(request, {'error': str(e)}, status=BAD_REQUEST_400)
+        return JSONResponse(request, {"error": str(e)}, status=BAD_REQUEST_400)
 
 
 server.serve_forever(str(wifi.radio.ipv4_address), port)

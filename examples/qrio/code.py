@@ -23,7 +23,7 @@ pycam = PyCamera()
 pycam.camera.reconfigure(
     pixel_format=espcamera.PixelFormat.RGB565,
     frame_size=espcamera.FrameSize.VGA,
-    )
+)
 pycam._mode_label.text = "QR SCAN"
 pycam._res_label.text = ""
 pycam.effect = 0
@@ -35,7 +35,7 @@ while True:
     new_frame = pycam.continuous_capture()
     if new_frame is None:
         continue
-    bitmaptools.blit(zoomed, new_frame, 0, 0, x1=(640-240)//2, y1=(480-176)//2)
+    bitmaptools.blit(zoomed, new_frame, 0, 0, x1=(640 - 240) // 2, y1=(480 - 176) // 2)
     pycam.blit(zoomed)
     for row in qrdecoder.decode(zoomed, qrio.PixelPolicy.RGB565_SWAPPED):
         payload = row.payload
@@ -46,6 +46,6 @@ while True:
         if payload != old_payload:
             pycam.tone(200, 0.1)
             print(payload)
-            pycam.display_message(payload, color=0xffffff, scale=1)
+            pycam.display_message(payload, color=0xFFFFFF, scale=1)
             time.sleep(1)
             old_payload = payload

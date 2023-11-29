@@ -11,25 +11,26 @@ import bitmaptools
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.autofocus_init()
-#pycam.live_preview_mode()
+# pycam.live_preview_mode()
 
 settings = (None, "resolution", "effect", "mode", "led_level", "led_color")
 curr_setting = 0
 
 print("Starting!")
-#pycam.tone(200, 0.1)
+# pycam.tone(200, 0.1)
 last_frame = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 onionskin = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 while True:
-    if  (pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0):
+    if pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0:
         # alpha blend
         new_frame = pycam.continuous_capture()
-        bitmaptools.alphablend(onionskin, last_frame, new_frame,
-                               displayio.Colorspace.RGB565_SWAPPED)
+        bitmaptools.alphablend(
+            onionskin, last_frame, new_frame, displayio.Colorspace.RGB565_SWAPPED
+        )
         pycam.blit(onionskin)
     else:
         pycam.blit(pycam.continuous_capture())
-    #print("\t\t", capture_time, blit_time)
+    # print("\t\t", capture_time, blit_time)
 
     pycam.keys_debounce()
     # test shutter button
@@ -56,26 +57,31 @@ while True:
 
         if pycam.mode_text == "GIF":
             try:
-               f = pycam.open_next_image("gif")
+                f = pycam.open_next_image("gif")
             except RuntimeError as e:
-               pycam.display_message("Error\nNo SD Card", color=0xFF0000)
-               time.sleep(0.5)
-               continue
+                pycam.display_message("Error\nNo SD Card", color=0xFF0000)
+                time.sleep(0.5)
+                continue
             i = 0
             ft = []
             pycam._mode_label.text = "RECORDING"
 
             pycam.display.refresh()
-            with gifio.GifWriter(f, pycam.camera.width, pycam.camera.height,
-                                 displayio.Colorspace.RGB565_SWAPPED, dither=True) as g:
+            with gifio.GifWriter(
+                f,
+                pycam.camera.width,
+                pycam.camera.height,
+                displayio.Colorspace.RGB565_SWAPPED,
+                dither=True,
+            ) as g:
                 t00 = t0 = time.monotonic()
                 while (i < 15) or (pycam.shutter_button.value == False):
                     i += 1
                     _gifframe = pycam.continuous_capture()
-                    g.add_frame(_gifframe, .12)
+                    g.add_frame(_gifframe, 0.12)
                     pycam.blit(_gifframe)
                     t1 = time.monotonic()
-                    ft.append(1/(t1-t0))
+                    ft.append(1 / (t1 - t0))
                     print(end=".")
                     t0 = t1
             pycam._mode_label.text = "GIF"
@@ -133,16 +139,16 @@ while True:
         print("LF")
         curr_setting = (curr_setting + 1) % len(settings)
         print(settings[curr_setting])
-        #new_res = min(len(pycam.resolutions)-1, pycam.get_resolution()+1)
-        #pycam.set_resolution(pycam.resolutions[new_res])
+        # new_res = min(len(pycam.resolutions)-1, pycam.get_resolution()+1)
+        # pycam.set_resolution(pycam.resolutions[new_res])
         pycam.select_setting(settings[curr_setting])
     if pycam.right.fell:
         print("RT")
         curr_setting = (curr_setting - 1 + len(settings)) % len(settings)
         print(settings[curr_setting])
         pycam.select_setting(settings[curr_setting])
-        #new_res = max(1, pycam.get_resolution()-1)
-        #pycam.set_resolution(pycam.resolutions[new_res])
+        # new_res = max(1, pycam.get_resolution()-1)
+        # pycam.set_resolution(pycam.resolutions[new_res])
     if pycam.select.fell:
         print("SEL")
     if pycam.ok.fell:

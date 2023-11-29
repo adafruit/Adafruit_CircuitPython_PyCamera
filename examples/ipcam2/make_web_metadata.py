@@ -1,6 +1,9 @@
 import json
 
-def list_range(*args): return list(range(*args))
+
+def list_range(*args):
+    return list(range(*args))
+
 
 metadata = {
     "property": {
@@ -33,7 +36,7 @@ metadata = {
         "led_color": list_range(8),
     },
     "property2": {
-        #"sensor_name": None,
+        # "sensor_name": None,
         "contrast": list_range(-2, 3),
         "brightness": list_range(-2, 3),
         "saturation": list_range(-2, 3),

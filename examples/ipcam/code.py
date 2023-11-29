@@ -62,6 +62,7 @@ async def main():
     poll_task = asyncio.create_task(poll(0))
     await asyncio.gather(poll_task)
 
+
 pycam.display_message(f"{wifi.radio.ipv4_address}:{PORT}/", scale=2)
 
 asyncio.run(main())

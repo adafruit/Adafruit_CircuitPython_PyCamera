@@ -5,7 +5,7 @@ var ii = 0;
 function option_change(k1, k2) {
     var id_ = k1 + "-" + k2;
     var el = document.getElementById(id_)
-    
+
     url = `/${k1}?k=${k2}&v=${el.value}`
     console.log(url)
     var req = new XMLHttpRequest();
@@ -27,7 +27,7 @@ function make_controls(k1, t) {
         }
         var ht = html`
         <form >
-        <label for="${id_}">${k2}:</label> 
+        <label for="${id_}">${k2}:</label>
         <select id="${id_}" onchange="option_change('${k1}', '${k2}')">
         ${options}
         </select>
