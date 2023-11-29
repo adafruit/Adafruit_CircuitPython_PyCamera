@@ -7,15 +7,17 @@ This demo is designed for the Kaluga development kit version 1.3 with the
 ILI9341 display.
 """
 
-from terminalio import FONT
+import time
+
+import bitmaptools
 import board
 import busio
 import displayio
-import qrio
-import time
-import bitmaptools
 import espcamera
+import qrio
 from adafruit_display_text.bitmap_label import Label
+from terminalio import FONT
+
 from adafruit_pycamera import PyCamera
 
 zoomed = displayio.Bitmap(240, 176, 65535)

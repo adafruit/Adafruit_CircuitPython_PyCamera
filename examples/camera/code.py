@@ -1,13 +1,15 @@
 import os
+import struct
 import sys
 import time
-import struct
+
+import bitmaptools
 import board
-import adafruit_pycamera
 import displayio
 import gifio
 import ulab.numpy as np
-import bitmaptools
+
+import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.autofocus_init()

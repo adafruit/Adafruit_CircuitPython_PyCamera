@@ -1,26 +1,26 @@
 import os
+import struct
 import sys
 import time
-import struct
-import board
-from digitalio import DigitalInOut, Direction, Pull
-from adafruit_debouncer import Debouncer, Button
-import bitmaptools
-import busio
+
+import adafruit_aw9523
 import adafruit_lis3dh
-import neopixel
-from rainbowio import colorwheel
-import sdcardio
-import storage
+import bitmaptools
+import board
+import busio
 import displayio
 import espcamera
-from adafruit_st7789 import ST7789
-import terminalio
-from adafruit_display_text import label
-import pwmio
 import microcontroller
-import adafruit_aw9523
+import neopixel
+import pwmio
+import sdcardio
+import storage
+import terminalio
 from adafruit_bus_device.i2c_device import I2CDevice
+from adafruit_debouncer import Button, Debouncer
+from adafruit_display_text import label
+from adafruit_st7789 import ST7789
+from digitalio import DigitalInOut, Direction, Pull
 from rainbowio import colorwheel
 
 __version__ = "0.0.0-auto.0"

@@ -5,12 +5,13 @@ import struct
 import sys
 import time
 
-import adafruit_pycamera
 import espcamera
 import socketpool
 import wifi
 from adafruit_httpserver.response import ChunkedResponse
 from adafruit_httpserver.server import Server
+
+import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.camera.reconfigure(

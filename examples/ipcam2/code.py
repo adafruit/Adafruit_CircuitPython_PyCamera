@@ -4,30 +4,22 @@ import struct
 import sys
 import time
 
-import adafruit_pycamera
 import bitmaptools
 import board
 import displayio
 import espcamera
 import gifio
 import socketpool
-import ulab.numpy as np
-import wifi
-from adafruit_httpserver import (
-    BAD_REQUEST_400,
-    GET,
-    NOT_FOUND_404,
-    POST,
-    FileResponse,
-    JSONResponse,
-    Request,
-    Response,
-    Server,
-)
-
 # Disable autoreload. this is very handy while editing the js & html files
 # as you want to just reload the web browser, not the CircutPython program!
 import supervisor
+import ulab.numpy as np
+import wifi
+from adafruit_httpserver import (BAD_REQUEST_400, GET, NOT_FOUND_404, POST,
+                                 FileResponse, JSONResponse, Request, Response,
+                                 Server)
+
+import adafruit_pycamera
 
 supervisor.runtime.autoreload = False
 
