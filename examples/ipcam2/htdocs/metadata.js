@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
 //
+// SPDX-License-Identifier: MIT
 // SPDX-License-Identifier: Unlicense
 
 tunables = {
