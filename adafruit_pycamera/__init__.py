@@ -531,7 +531,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
 
-    def init_display(self):
+    def init_display(self, reset=board.TFT_RESET):
         """Initialize the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
@@ -539,7 +539,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._spi,
             command=board.TFT_DC,
             chip_select=board.TFT_CS,
-            reset=board.TFT_RESET,
+            reset=reset,
             baudrate=60_000_000,
         )
         self.display = board.DISPLAY
@@ -567,7 +567,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
         text_area.anchor_point = (0.5, 0.5)
         if not self.display:
-            self.init_display()
+            self.init_display(None)
         text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
 
         # Show it
@@ -611,7 +611,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         vfs = storage.VfsFat(self.sdcard)
         print("mount vfs @", time.monotonic() - self._timestamp)
         storage.mount(vfs, "/sd")
-        self.init_display()
+        self.init_display(None)
         self._image_counter = 0
         self._sd_label.text = "SD OK"
         self._sd_label.color = 0x00FF00
