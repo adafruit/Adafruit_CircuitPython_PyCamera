@@ -529,7 +529,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
 
-    def init_display(self, reset=board.TFT_RESET):
+    def init_display(self, reset=True):
         """Initialize the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
@@ -537,7 +537,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._spi,
             command=board.TFT_DC,
             chip_select=board.TFT_CS,
-            reset=reset,
+            reset=board.TFT_RESET if reset else None,
             baudrate=60_000_000,
         )
         self.display = board.DISPLAY
