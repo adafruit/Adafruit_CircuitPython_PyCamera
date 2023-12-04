@@ -585,7 +585,9 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._card_power.value = True
         card_cs = DigitalInOut(board.CARD_CS)
         card_cs.switch_to_output(False)
-        # deinit display and SPI
+        # deinit display and SPI bus because we need to drive all SD pins LOW
+        # to ensure nothing, not even an I/O pin, could possibly power the SD
+        # card
         self.deinit_display()
         self._spi.deinit()
         sckpin = DigitalInOut(board.SCK)
