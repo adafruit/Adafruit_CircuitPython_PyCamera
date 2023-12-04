@@ -449,7 +449,10 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._effect_label.background_color = 0x0
         self._res_label.color = 0xFFFFFF
         self._res_label.background_color = 0x0
-        self._res_label.text = self.resolutions[self._resolution]
+        if self.mode_text in ("GIF", "GBOY"):
+            self._res_label.text = ""
+        else:
+            self._res_label.text = self.resolutions[self._resolution]
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
         if setting_name == "effect":
