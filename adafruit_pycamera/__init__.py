@@ -170,7 +170,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         "Sepia",
         "Solarize",
     )
-    modes = ("JPEG", "GIF", "STOP")
+    modes = ("JPEG", "GIF", "GBOY", "STOP")
 
     _INIT_SEQUENCE = (
         b"\x01\x80\x78"  # _SWRESET and Delay 120ms
@@ -488,7 +488,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._mode_label.text = self.modes[setting]
         if self.modes[setting] == "STOP":
             self.stop_motion_frame = 0
-        if self.modes[setting] == "GIF":
+        if self.modes[setting] in ("GIF", "GBOY"):
             self._res_label.text = ""
         else:
             self.resolution = self.resolution  # kick it to reset the display
