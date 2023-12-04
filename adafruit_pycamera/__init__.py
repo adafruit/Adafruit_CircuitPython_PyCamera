@@ -159,8 +159,6 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         # espcamera.FrameSize.P_FHD, # 1080x1920
         espcamera.FrameSize.QSXGA,  # 2560x1920
     )
-    combined_list = list(zip(resolutions, resolution_to_frame_size))
-    print(combined_list)
 
     effects = (
         "Normal",
