@@ -30,6 +30,11 @@ while True:
             onionskin, last_frame, new_frame, displayio.Colorspace.RGB565_SWAPPED
         )
         pycam.blit(onionskin)
+    elif pycam.mode_text == "GBOY":
+        bitmaptools.dither(
+            last_frame, pycam.continuous_capture(), displayio.Colorspace.RGB565_SWAPPED
+        )
+        pycam.blit(last_frame)
     else:
         pycam.blit(pycam.continuous_capture())
     # print("\t\t", capture_time, blit_time)
@@ -56,6 +61,23 @@ while True:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
             pycam.live_preview_mode()
+
+        if pycam.mode_text == "GBOY":
+            try:
+                f = pycam.open_next_image("gif")
+            except RuntimeError as e:
+                pycam.display_message("Error\nNo SD Card", color=0xFF0000)
+                time.sleep(0.5)
+                continue
+
+            with gifio.GifWriter(
+                f,
+                pycam.camera.width,
+                pycam.camera.height,
+                displayio.Colorspace.RGB565_SWAPPED,
+                dither=True,
+            ) as g:
+                g.add_frame(last_frame, 1)
 
         if pycam.mode_text == "GIF":
             try:

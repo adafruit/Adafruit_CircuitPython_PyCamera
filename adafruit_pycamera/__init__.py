@@ -159,8 +159,6 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         # espcamera.FrameSize.P_FHD, # 1080x1920
         espcamera.FrameSize.QSXGA,  # 2560x1920
     )
-    combined_list = list(zip(resolutions, resolution_to_frame_size))
-    print(combined_list)
 
     effects = (
         "Normal",
@@ -172,7 +170,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         "Sepia",
         "Solarize",
     )
-    modes = ("JPEG", "GIF", "STOP")
+    modes = ("JPEG", "GIF", "GBOY", "STOP")
 
     _INIT_SEQUENCE = (
         b"\x01\x80\x78"  # _SWRESET and Delay 120ms
@@ -451,7 +449,10 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._effect_label.background_color = 0x0
         self._res_label.color = 0xFFFFFF
         self._res_label.background_color = 0x0
-        self._res_label.text = self.resolutions[self._resolution]
+        if self.mode_text in ("GIF", "GBOY"):
+            self._res_label.text = ""
+        else:
+            self._res_label.text = self.resolutions[self._resolution]
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
         if setting_name == "effect":
@@ -490,7 +491,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._mode_label.text = self.modes[setting]
         if self.modes[setting] == "STOP":
             self.stop_motion_frame = 0
-        if self.modes[setting] == "GIF":
+        if self.modes[setting] in ("GIF", "GBOY"):
             self._res_label.text = ""
         else:
             self.resolution = self.resolution  # kick it to reset the display
@@ -531,7 +532,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
 
-    def init_display(self):
+    def init_display(self, reset=True):
         """Initialize the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
@@ -539,7 +540,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._spi,
             command=board.TFT_DC,
             chip_select=board.TFT_CS,
-            reset=board.TFT_RESET,
+            reset=board.TFT_RESET if reset else None,
             baudrate=60_000_000,
         )
         self.display = board.DISPLAY
@@ -567,7 +568,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
         text_area.anchor_point = (0.5, 0.5)
         if not self.display:
-            self.init_display()
+            self.init_display(None)
         text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
 
         # Show it
@@ -587,7 +588,9 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._card_power.value = True
         card_cs = DigitalInOut(board.CARD_CS)
         card_cs.switch_to_output(False)
-        # deinit display and SPI
+        # deinit display and SPI bus because we need to drive all SD pins LOW
+        # to ensure nothing, not even an I/O pin, could possibly power the SD
+        # card
         self.deinit_display()
         self._spi.deinit()
         sckpin = DigitalInOut(board.SCK)
@@ -611,7 +614,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         vfs = storage.VfsFat(self.sdcard)
         print("mount vfs @", time.monotonic() - self._timestamp)
         storage.mount(vfs, "/sd")
-        self.init_display()
+        self.init_display(None)
         self._image_counter = 0
         self._sd_label.text = "SD OK"
         self._sd_label.color = 0x00FF00
