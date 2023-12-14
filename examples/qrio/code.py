@@ -10,33 +10,26 @@ ILI9341 display.
 
 import time
 
-import bitmaptools
-import displayio
-import espcamera
 import qrio
 
 from adafruit_pycamera import PyCamera
 
-zoomed = displayio.Bitmap(240, 176, 65535)
 pycam = PyCamera()
-pycam.camera.reconfigure(
-    pixel_format=espcamera.PixelFormat.RGB565,
-    frame_size=espcamera.FrameSize.VGA,
-)
 pycam._mode_label.text = "QR SCAN"  # pylint: disable=protected-access
 pycam._res_label.text = ""  # pylint: disable=protected-access
 pycam.effect = 0
+pycam.camera.hmirror = False
 pycam.display.refresh()
-qrdecoder = qrio.QRDecoder(zoomed.width, zoomed.height)
+qrdecoder = qrio.QRDecoder(pycam.camera.width, pycam.camera.height)
 
 old_payload = None
 while True:
     new_frame = pycam.continuous_capture()
     if new_frame is None:
         continue
-    bitmaptools.blit(zoomed, new_frame, 0, 0, x1=(640 - 240) // 2, y1=(480 - 176) // 2)
-    pycam.blit(zoomed)
-    for row in qrdecoder.decode(zoomed, qrio.PixelPolicy.RGB565_SWAPPED):
+    pycam.blit(new_frame)
+    for row in qrdecoder.decode(new_frame, qrio.PixelPolicy.RGB565_SWAPPED):
+        print(row)
         payload = row.payload
         try:
             payload = payload.decode("utf-8")
