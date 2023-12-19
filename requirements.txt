@@ -6,3 +6,7 @@
 Adafruit-Blinka
 adafruit-circuitpython-busdevice
 adafruit-circuitpython-aw9523
+adafruit-circuitpython-lis3dh
+adafruit-circuitpython-display-text
+adafruit-circuitpython-neopixel
+adafruit-circuitpython-debouncer
