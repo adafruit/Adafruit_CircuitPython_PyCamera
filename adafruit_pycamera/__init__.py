@@ -311,7 +311,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._camera_device = I2CDevice(self._i2c, self.camera.address)
         # display.auto_refresh = False
 
-        self.camera.hmirror = True
+        self.camera.hmirror = False
         self.camera.vflip = True
 
         self._bigbuf = None
