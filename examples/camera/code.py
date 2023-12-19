@@ -12,6 +12,7 @@ import ulab.numpy as np
 import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
+pycam.camera.hmirror = False
 pycam.autofocus_init()
 # pycam.live_preview_mode()
 
