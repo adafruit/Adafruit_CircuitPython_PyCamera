@@ -258,7 +258,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
 
         self._card_power = make_expander_output(_AW_SDPWR, True)
 
-        self.mute = make_expander_input(_AW_MUTE)
+        self.mute = make_expander_output(_AW_MUTE, False)
 
         self.sdcard = None
         try:
