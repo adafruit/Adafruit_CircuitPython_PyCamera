@@ -703,6 +703,25 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         """Switch the camera to continuous-capture mode"""
         pass  # pylint: disable=unnecessary-pass
 
+    def capture_into_jpeg(self):
+        """Captures an image and returns it in JPEG format.
+
+        Returns:
+            bytes: The captured image in JPEG format, otherwise None if the capture failed.
+        """
+        self.camera.reconfigure(
+            pixel_format=espcamera.PixelFormat.JPEG,
+            frame_size=self.resolution_to_frame_size[self._resolution],
+        )
+        time.sleep(0.1)
+        jpeg = self.camera.take(1)
+        if jpeg is not None:
+            print(f"Captured {len(jpeg)} bytes of jpeg data")
+            print("Resolution %d x %d" % (self.camera.width, self.camera.height))
+        else:
+            print("JPEG capture failed")
+        return jpeg
+
     def capture_into_bitmap(self, bitmap):
         """Capture an image and blit it into the given bitmap"""
         bitmaptools.blit(bitmap, self.continuous_capture(), 0, 0)
