@@ -17,6 +17,8 @@ import adafruit_lis3dh
 import bitmaptools
 import board
 import displayio
+import fourwire
+import busdisplay
 import espcamera
 import microcontroller
 import neopixel
@@ -540,16 +542,15 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         """Initialize the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
-        self._display_bus = displayio.FourWire(
+        self._display_bus = fourwire.FourWire(
             self._spi,
             command=board.TFT_DC,
             chip_select=board.TFT_CS,
             reset=None,
             baudrate=60_000_000,
         )
-        self.display = board.DISPLAY
         # init specially since we are going to write directly below
-        self.display = displayio.Display(
+        self.display = busdisplay.BusDisplay(
             self._display_bus,
             self._INIT_SEQUENCE,
             width=240,
