@@ -751,7 +751,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         or the camera's capture mode is changed"""
         return self.camera.take(1)
 
-    def blit(self, bitmap):
+    def blit(self, bitmap, x_offset=0, y_offset=32):
         """Display a bitmap direct to the LCD, bypassing displayio
 
         This can be more efficient than displaying a bitmap as a displayio
@@ -762,8 +762,12 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         for status information.
         """
 
-        self._display_bus.send(42, struct.pack(">hh", 80, 80 + bitmap.width - 1))
-        self._display_bus.send(43, struct.pack(">hh", 32, 32 + bitmap.height - 1))
+        self._display_bus.send(
+            42, struct.pack(">hh", 80 + x_offset, 80 + x_offset + bitmap.width - 1)
+        )
+        self._display_bus.send(
+            43, struct.pack(">hh", y_offset, y_offset + bitmap.height - 1)
+        )
         self._display_bus.send(44, bitmap)
 
     @property
