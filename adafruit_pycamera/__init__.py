@@ -198,7 +198,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.display = None
         self.pixels = None
         self.sdcard = None
-        self.splash = None
+        self.splash = displayio.Group()
 
         # Reset display and I/O expander
         self._tft_aw_reset = DigitalInOut(board.TFT_RESET)
@@ -246,7 +246,6 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
 
     def make_camera_ui(self):
         """Create displayio widgets for the standard camera UI"""
-        self.splash = displayio.Group()
         self._sd_label = label.Label(
             terminalio.FONT, text="SD ??", color=0x0, x=150, y=10, scale=2
         )
