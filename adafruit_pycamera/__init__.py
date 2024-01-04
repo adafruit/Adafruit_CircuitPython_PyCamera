@@ -384,9 +384,19 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             raise RuntimeError(f"Autofocus not supported on {self.camera.sensor_name}")
 
         self.write_camera_register(0x3000, 0x20)  # reset autofocus coprocessor
+        time.sleep(0.01)
 
-        for addr, val in enumerate(firmware):
-            self.write_camera_register(0x8000 + addr, val)
+        arr = bytearray(256)
+        with self._camera_device as i2c:
+            for offset in range(0, len(firmware), 254):
+                num_firmware_bytes = min(254, len(firmware) - offset)
+                reg = offset + 0x8000
+                arr[0] = reg >> 8
+                arr[1] = reg & 0xFF
+                arr[2 : 2 + num_firmware_bytes] = firmware[
+                    offset : offset + num_firmware_bytes
+                ]
+                i2c.write(arr, end=2 + num_firmware_bytes)
 
         self.write_camera_list(self._finalize_firmware_load)
         for _ in range(100):
