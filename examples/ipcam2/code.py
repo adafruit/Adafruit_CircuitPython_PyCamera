@@ -29,7 +29,6 @@ import adafruit_pycamera
 supervisor.runtime.autoreload = False
 
 pycam = adafruit_pycamera.PyCamera()
-pycam.autofocus_init()
 
 if wifi.radio.ipv4_address:
     # use alt port if web workflow enabled
