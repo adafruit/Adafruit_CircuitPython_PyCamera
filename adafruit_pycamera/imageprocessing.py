@@ -1,20 +1,22 @@
-import sys
-import struct
-import displayio
+# SPDX-FileCopyrightText: 2024 Jeff Epler for Adafruit Industries
+#
+# SPDX-License-Identifier: MIT
+"""Routines for performing image manipulation"""
 
-try:
-    import numpy as np
-except:
-    import ulab.numpy as np
+import struct
+
+import ulab.numpy as np
 
 
 def _bytes_per_row(source_width: int) -> int:
+    """Internal function to determine bitmap bytes per row"""
     pixel_bytes = 3 * source_width
     padding_bytes = (4 - (pixel_bytes % 4)) % 4
     return pixel_bytes + padding_bytes
 
 
-def _write_bmp_header(output_file: BufferedWriter, filesize: int) -> None:
+def _write_bmp_header(output_file, filesize):
+    """Internal function to write bitmap header"""
     output_file.write(bytes("BM", "ascii"))
     output_file.write(struct.pack("<I", filesize))
     output_file.write(b"\00\x00")
@@ -22,7 +24,8 @@ def _write_bmp_header(output_file: BufferedWriter, filesize: int) -> None:
     output_file.write(struct.pack("<I", 54))
 
 
-def _write_dib_header(output_file: BufferedWriter, width: int, height: int) -> None:
+def _write_dib_header(output_file, width: int, height: int) -> None:
+    """Internal function to write bitmap "dib" header"""
     output_file.write(struct.pack("<I", 40))
     output_file.write(struct.pack("<I", width))
     output_file.write(struct.pack("<I", height))
@@ -32,31 +35,33 @@ def _write_dib_header(output_file: BufferedWriter, width: int, height: int) -> N
         output_file.write(b"\x00")
 
 
-def components_to_file_rgb565(output_file, r, g, b):
+def components_to_bitmap(output_file, r, g, b):
+    """Write image components to an uncompressed 24-bit .bmp format file"""
     height, width = r.shape
     pixel_bytes = 3 * width
     padding_bytes = (4 - (pixel_bytes % 4)) % 4
     filesize = 54 + height * (pixel_bytes + padding_bytes)
     _write_bmp_header(output_file, filesize)
     _write_dib_header(output_file, width, height)
-    p = b"\0" * padding_bytes
-    m = memoryview(buffer_from_components_rgb888(r, g, b))
-    for i in range(0, len(m), pixel_bytes)[::-1]:
-        output_file.write(m[i : i + pixel_bytes])
-        output_file.write(p)
+    pad = b"\0" * padding_bytes
+    view = memoryview(buffer_from_components_rgb888(r, g, b))
+    # Write out image data in reverse order with padding between rows
+    for i in range(0, len(view), pixel_bytes)[::-1]:
+        output_file.write(view[i : i + pixel_bytes])
+        output_file.write(pad)
 
 
-def np_convolve_same(a, v):
-    """Perform the np.convolve(mode=same) operation
+def _np_convolve_same(arr, coeffs):
+    """Internal function to perform the np.convolve(arr, coeffs, mode="same") operation
 
     This is not directly supported on ulab, so we have to slice the "full" mode result
     """
-    if len(a) < len(v):
-        a, v = v, a
-    tmp = np.convolve(a, v)
-    n = len(a)
-    c = (len(v) - 1) // 2
-    result = tmp[c : c + n]
+    if len(arr) < len(coeffs):
+        arr, coeffs = coeffs, arr
+    tmp = np.convolve(arr, coeffs)
+    n = len(arr)
+    offset = (len(coeffs) - 1) // 2
+    result = tmp[offset : offset + n]
     return result
 
 
@@ -66,58 +71,60 @@ EIGHT_BITS = 0b11111111
 
 
 def bitmap_as_array(bitmap):
-    ### XXX todo: work on blinka
+    """Create an array object that accesses the bitmap data"""
     if bitmap.width % 2:
         raise ValueError("Can only work on even-width bitmaps")
-    return (
-        np.frombuffer(bitmap, dtype=np.uint16)
-        .reshape((bitmap.height, bitmap.width))
-        .byteswap()
-    )
+    return np.frombuffer(bitmap, dtype=np.uint16).reshape((bitmap.height, bitmap.width))
+
+
+def array_cast(arr, dtype):
+    """Cast an array to a given type and shape. The new type must match the original
+    type's size in bytes."""
+    return np.frombuffer(arr, dtype=dtype).reshape(arr.shape)
 
 
 def bitmap_to_components_rgb565(bitmap):
-    """Convert a RGB65_BYTESWAPPED image to float32 components in the [0,1] inclusive range"""
-    arr = bitmap_as_array(bitmap)
+    """Convert a RGB65_BYTESWAPPED image to int16 components in the [0,255] inclusive range
 
-    r = np.right_shift(arr, 11) * (1.0 / FIVE_BITS)
-    g = (np.right_shift(arr, 5) & SIX_BITS) * (1.0 / SIX_BITS)
-    b = (arr & FIVE_BITS) * (1.0 / FIVE_BITS)
+    This requires higher memory than uint8, but allows more arithmetic on pixel values;
+    converting back to bitmap clamps values to the appropriate range."""
+    arr = bitmap_as_array(bitmap)
+    arr.byteswap(inplace=True)
+    r = array_cast(np.right_shift(arr, 8) & 0xF8, np.int16)
+    g = array_cast(np.right_shift(arr, 3) & 0xFC, np.int16)
+    b = array_cast(np.left_shift(arr, 3) & 0xF8, np.int16)
+    arr.byteswap(inplace=True)
     return r, g, b
 
 
-def bitmap_from_components_rgb565(r, g, b):
-    """Convert the float32 components to a bitmap"""
-    h, w = r.shape
-    result = displayio.Bitmap(w, h, 65535)
-    return bitmap_from_components_inplace_rgb565(result, r, g, b)
-
-
-def bitmap_from_components_inplace_rgb565(bitmap, r, g, b):
-    arr = bitmap_as_array(bitmap)
-    r = np.array(np.maximum(np.minimum(r, 1.0), 0.0) * FIVE_BITS, dtype=np.uint16)
-    g = np.array(np.maximum(np.minimum(g, 1.0), 0.0) * SIX_BITS, dtype=np.uint16)
-    b = np.array(np.maximum(np.minimum(b, 1.0), 0.0) * FIVE_BITS, dtype=np.uint16)
-    arr = np.left_shift(r, 11)
-    arr[:] |= np.left_shift(g, 5)
-    arr[:] |= b
-    arr = arr.byteswap().flatten()
-    dest = np.frombuffer(bitmap, dtype=np.uint16)
-    dest[:] = arr
+def bitmap_from_components_inplace_rgb565(
+    bitmap, r, g, b
+):  # pylint: disable=invalid-name
+    """Update a bitmap in-place with new RGB values"""
+    dest = bitmap_as_array(bitmap)
+    r = array_cast(np.maximum(np.minimum(r, 255), 0), np.uint16)
+    g = array_cast(np.maximum(np.minimum(g, 255), 0), np.uint16)
+    b = array_cast(np.maximum(np.minimum(b, 255), 0), np.uint16)
+    dest[:] = np.left_shift(r & 0xF8, 8)
+    dest[:] |= np.left_shift(g & 0xFC, 3)
+    dest[:] |= np.right_shift(b, 3)
+    dest.byteswap(inplace=True)
     return bitmap
 
 
+def as_flat(arr):
+    """Flatten an array, ensuring no copy is made"""
+    return np.frombuffer(arr, arr.dtype)
+
+
 def buffer_from_components_rgb888(r, g, b):
-    """Convert the float32 components to a RGB888 buffer in memory"""
-    r = np.array(
-        np.maximum(np.minimum(r, 1.0), 0.0) * EIGHT_BITS, dtype=np.uint8
-    ).flatten()
-    g = np.array(
-        np.maximum(np.minimum(g, 1.0), 0.0) * EIGHT_BITS, dtype=np.uint8
-    ).flatten()
-    b = np.array(
-        np.maximum(np.minimum(b, 1.0), 0.0) * EIGHT_BITS, dtype=np.uint8
-    ).flatten()
+    """Convert the individual color components to a single RGB888 buffer in memory"""
+    r = as_flat(r)
+    g = as_flat(g)
+    b = as_flat(b)
+    r = np.maximum(np.minimum(r, 0x3F), 0)
+    g = np.maximum(np.minimum(g, 0x3F), 0)
+    b = np.maximum(np.minimum(b, 0x3F), 0)
     result = np.zeros(3 * len(r), dtype=np.uint8)
     result[2::3] = r
     result[1::3] = g
@@ -125,129 +132,144 @@ def buffer_from_components_rgb888(r, g, b):
     return result
 
 
-def separable_filter(data, vh, vv=None):
-    """Apply a separable filter to a 2d array.
+def symmetric_filter_inplace(data, coeffs, scale):
+    """Apply a symmetric separable filter to a 2d array, changing it in place.
 
-    If the vertical coefficients ``vv`` are none, the ``vh`` components are
-    used for vertical too."""
-    if vv is None:
-        vv = vh
+    The same filter is applied to image rows and image columns. This is appropriate for
+    many common kinds of image filters such as blur, sharpen, and edge detect.
 
-    result = data[:]
-
+    Normally, scale is sum(coeffs)."""
     # First run the filter across each row
-    n_rows = result.shape[0]
+    n_rows = data.shape[0]
     for i in range(n_rows):
-        result[i, :] = np_convolve_same(result[i, :], vh)
+        data[i, :] = _np_convolve_same(data[i, :], coeffs) // scale
 
     # Run the filter across each column
-    n_cols = result.shape[1]
+    n_cols = data.shape[1]
     for i in range(n_cols):
-        result[:, i] = np_convolve_same(result[:, i], vv)
+        data[:, i] = _np_convolve_same(data[:, i], coeffs) // scale
 
-    return result
+    return data
 
 
-def bitmap_separable_filter(bitmap, vh, vv=None):
-    """Apply a separable filter to an image, returning a new image"""
+def bitmap_symmetric_filter_inplace(bitmap, coeffs, scale):
+    """Apply a symmetric filter to an image, updating the original image"""
     r, g, b = bitmap_to_components_rgb565(bitmap)
-    r = separable_filter(r, vh, vv)
-    g = separable_filter(g, vh, vv)
-    b = separable_filter(b, vh, vv)
-    return bitmap_from_components_rgb565(r, g, b)
+    symmetric_filter_inplace(r, coeffs, scale)
+    symmetric_filter_inplace(g, coeffs, scale)
+    symmetric_filter_inplace(b, coeffs, scale)
+    return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
 
 
-def bitmap_channel_filter3(
+def bitmap_channel_filter3_inplace(
     bitmap, r_func=lambda r, g, b: r, g_func=lambda r, g, b: g, b_func=lambda r, g, b: b
 ):
-    """Perform channel filtering where each function recieves all 3 channels"""
+    """Perform channel filtering in place, updating the original image
+
+    Each callback function recieves all 3 channels"""
     r, g, b = bitmap_to_components_rgb565(bitmap)
     r = r_func(r, g, b)
     g = g_func(r, g, b)
     b = b_func(r, g, b)
-    return bitmap_from_components_rgb565(r, g, b)
+    return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
 
 
-def bitmap_channel_filter1(
+def bitmap_channel_filter1_inplace(
     bitmap, r_func=lambda r: r, g_func=lambda g: g, b_func=lambda b: b
 ):
-    """Perform channel filtering where each function recieves just one channel"""
-    return bitmap_channel_filter3(
-        bitmap,
-        lambda r, g, b: r_func(r),
-        lambda r, g, b: g_func(g),
-        lambda r, g, b: b_func(b),
-    )
+    """Perform channel filtering in place, updating the original image
+
+    Each callback function recieves just its own channel data."""
+    r, g, b = bitmap_to_components_rgb565(bitmap)
+    r[:] = r_func(r)
+    g[:] = g_func(g)
+    b[:] = b_func(b)
+    return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
 
 
-def solarize_channel(c, threshold=0.5):
+def solarize_channel(data, threshold=128):
     """Solarize an image channel.
 
     If the channel value is above a threshold, it is inverted. Otherwise, it is unchanged.
     """
-    return (-1 * arr) * (arr > threshold) + arr * (arr <= threshold)
+    return (255 - data) * (data > threshold) + data * (data <= threshold)
 
 
-def solarize(bitmap, threshold=0.5):
-    """Apply a solarize filter to an image"""
-    return bitmap_channel_filter1(
-        bitmap,
-        lambda r: solarize_channel(r, threshold),
-        lambda g: solarize_channel(r, threshold),
-        lambda b: solarize_channel(b, threshold),
-    )
+def solarize(bitmap, threshold=128):
+    """Apply a per-channel solarize filter to an image in place"""
+
+    def do_solarize(channel):
+        return solarize_channel(channel, threshold)
+
+    return bitmap_channel_filter1_inplace(bitmap, do_solarize, do_solarize, do_solarize)
 
 
 def sepia(bitmap):
-    """Apply a sepia filter to an image
+    """Apply a sepia filter to an image in place
 
     based on some coefficients I found on the internet"""
-    return bitmap_channel_filter3(
+    return bitmap_channel_filter3_inplace(
         bitmap,
-        lambda r, g, b: 0.393 * r + 0.769 * g + 0.189 * b,
-        lambda r, g, b: 0.349 * r + 0.686 * g + 0.168 * b,
-        lambda r, g, b: 0.272 * r + 0.534 * g + 0.131 * b,
+        lambda r, g, b: np.right_shift(50 * r + 98 * g + 24 * b, 7),
+        lambda r, g, b: np.right_shift(44 * r + 88 * g + 42 * b, 7),
+        lambda r, g, b: np.right_shift(35 * r + 69 * g + 17 * b, 7),
     )
 
 
 def greyscale(bitmap):
     """Convert an image to greyscale"""
     r, g, b = bitmap_to_components_rgb565(bitmap)
-    l = 0.2989 * r + 0.5870 * g + 0.1140 * b
-    return bitmap_from_components_rgb565(l, l, l)
+    luminance = np.right_shift(38 * r + 75 * g + 15 * b, 7)
+    return bitmap_from_components_inplace_rgb565(
+        bitmap, luminance, luminance, luminance
+    )
+
+
+def _identity(channel):
+    """An internal function to return a channel unchanged"""
+    return channel
+
+
+def _half(channel):
+    """An internal function to divide channel values by two"""
+    return channel // 2
 
 
 def red_cast(bitmap):
-    return bitmap_channel_filter1(
-        bitmap, lambda r: r, lambda g: g * 0.5, lambda b: b * 0.5
-    )
+    """Give an image a red cast by dividing G and B channels in half"""
+    return bitmap_channel_filter1_inplace(bitmap, _identity, _half, _half)
 
 
 def green_cast(bitmap):
-    return bitmap_channel_filter1(
-        bitmap, lambda r: r * 0.5, lambda g: g, lambda b: b * 0.5
-    )
+    """Give an image a green cast by dividing R and B channels in half"""
+    return bitmap_channel_filter1_inplace(bitmap, _half, _identity, _half)
 
 
 def blue_cast(bitmap):
-    return bitmap_channel_filter1(
-        bitmap, lambda r: r * 0.5, lambda g: g * 0.5, lambda b: b
-    )
+    """Give an image a blue cast by dividing R and G channels in half"""
+    return bitmap_channel_filter1_inplace(bitmap, _half, _half, _identity)
 
 
 def blur(bitmap):
-    return bitmap_separable_filter(bitmap, np.array([0.25, 0.5, 0.25]))
+    """Blur a bitmap"""
+    return bitmap_symmetric_filter_inplace(bitmap, np.array([1, 2, 1]), scale=4)
 
 
 def sharpen(bitmap):
-    y = 1 / 5
-    return bitmap_separable_filter(bitmap, np.array([-y, -y, 2 - y, -y, -y]))
+    """Sharpen a bitmap"""
+    return bitmap_symmetric_filter_inplace(
+        bitmap, np.array([-1, -1, 9, -1, -1]), scale=5
+    )
 
 
 def edgedetect(bitmap):
+    """Run an edge detection routine on a bitmap"""
     coefficients = np.array([-1, 0, 1])
     r, g, b = bitmap_to_components_rgb565(bitmap)
-    r = separable_filter(r, coefficients, coefficients) + 0.5
-    g = separable_filter(g, coefficients, coefficients) + 0.5
-    b = separable_filter(b, coefficients, coefficients) + 0.5
-    return bitmap_from_components_rgb565(r, g, b)
+    symmetric_filter_inplace(r, coefficients, scale=1)
+    r += 128
+    symmetric_filter_inplace(g, coefficients, scale=1)
+    g += 128
+    symmetric_filter_inplace(b, coefficients, scale=1)
+    b += 128
+    return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
