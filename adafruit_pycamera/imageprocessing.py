@@ -4,8 +4,36 @@
 """Routines for performing image manipulation"""
 
 import struct
+from adafruit_ticks import ticks_ms, ticks_diff
 
+from micropython import const
 import ulab.numpy as np
+
+# Optionally enable reporting of time taken inside tagged functions
+_DO_TIME_REPORT = const(0)
+
+if _DO_TIME_REPORT:
+
+    def _timereport(func):
+        """Report time taken within the function"""
+        name = str(func).split()[1]
+
+        def inner(*args, **kw):
+            start = ticks_ms()
+            try:
+                return func(*args, **kw)
+            finally:
+                end = ticks_ms()
+                duration = ticks_diff(end, start)
+                print(f"{name}: {duration}ms")
+
+        return inner
+
+else:
+
+    def _timereport(func):
+        """A do-nothing decorator for when timing report is not desired"""
+        return func
 
 
 def _bytes_per_row(source_width: int) -> int:
@@ -83,11 +111,14 @@ def _array_cast(arr, dtype):
     return np.frombuffer(arr, dtype=dtype).reshape(arr.shape)
 
 
+@_timereport
 def bitmap_to_components_rgb565(bitmap):
     """Convert a RGB565_BYTESWAPPED image to int16 components in the [0,255] inclusive range
 
     This requires higher memory than uint8, but allows more arithmetic on pixel values;
-    converting back to bitmap clamps values to the appropriate range.
+    but values are masked (not clamped) back down to the 0-255 range, so while intermediate
+    values can be -32768..32767 the values passed into bitmap_from_components_inplace_rgb565
+    muts be 0..255
 
     This only works on images whose width is a multiple of 2 pixels.
     """
@@ -100,17 +131,20 @@ def bitmap_to_components_rgb565(bitmap):
     return r, g, b
 
 
+@_timereport
 def bitmap_from_components_inplace_rgb565(
     bitmap, r, g, b
 ):  # pylint: disable=invalid-name
     """Update a bitmap in-place with new RGB values"""
     dest = _bitmap_as_array(bitmap)
-    r = _array_cast(np.maximum(np.minimum(r, 255), 0), np.uint16)
-    g = _array_cast(np.maximum(np.minimum(g, 255), 0), np.uint16)
-    b = _array_cast(np.maximum(np.minimum(b, 255), 0), np.uint16)
-    dest[:] = np.left_shift(r & 0xF8, 8)
-    dest[:] |= np.left_shift(g & 0xFC, 3)
-    dest[:] |= np.right_shift(b, 3)
+    r = _array_cast(r, np.uint16)
+    g = _array_cast(g, np.uint16)
+    b = _array_cast(b, np.uint16)
+    dest[:] = (
+        np.left_shift(r & 0xF8, 8)
+        | np.left_shift(g & 0xFC, 3)
+        | np.right_shift(b & 0xF8, 3)
+    )
     dest.byteswap(inplace=True)
     return bitmap
 
@@ -125,13 +159,10 @@ def buffer_from_components_rgb888(r, g, b):
     r = _as_flat(r)
     g = _as_flat(g)
     b = _as_flat(b)
-    r = np.maximum(np.minimum(r, 0x3F), 0)
-    g = np.maximum(np.minimum(g, 0x3F), 0)
-    b = np.maximum(np.minimum(b, 0x3F), 0)
     result = np.zeros(3 * len(r), dtype=np.uint8)
-    result[2::3] = r
-    result[1::3] = g
-    result[0::3] = b
+    result[2::3] = r & 0xFF
+    result[1::3] = g & 0xFF
+    result[0::3] = b & 0xFF
     return result
 
 
@@ -146,6 +177,7 @@ def symmetric_filter_inplace(data, coeffs, scale):
     column_filter_inplace(data, coeffs, scale)
 
 
+@_timereport
 def row_filter_inplace(data, coeffs, scale):
     """Apply a filter to data in rows, changing it in place"""
     n_rows = data.shape[0]
@@ -153,6 +185,7 @@ def row_filter_inplace(data, coeffs, scale):
         data[i, :] = _np_convolve_same(data[i, :], coeffs) // scale
 
 
+@_timereport
 def column_filter_inplace(data, coeffs, scale):
     """Apply a filter to data in columns, changing it in place"""
     n_cols = data.shape[1]
@@ -169,6 +202,7 @@ def bitmap_symmetric_filter_inplace(bitmap, coeffs, scale):
     return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
 
 
+@_timereport
 def bitmap_channel_filter3_inplace(
     bitmap, r_func=lambda r, g, b: r, g_func=lambda r, g, b: g, b_func=lambda r, g, b: b
 ):
@@ -182,6 +216,7 @@ def bitmap_channel_filter3_inplace(
     return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
 
 
+@_timereport
 def bitmap_channel_filter1_inplace(
     bitmap, r_func=lambda r: r, g_func=lambda g: g, b_func=lambda b: b
 ):
