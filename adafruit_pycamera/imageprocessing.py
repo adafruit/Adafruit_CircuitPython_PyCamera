@@ -213,14 +213,14 @@ def solarize(bitmap, threshold=128):
 
 
 def sepia(bitmap):
-    """Apply a sepia filter to an image in place
-
-    based on some coefficients I found on the internet"""
-    return bitmap_channel_filter3_inplace(
+    """Apply a sepia filter to an image in place"""
+    r, g, b = bitmap_to_components_rgb565(bitmap)
+    luminance = np.right_shift(38 * r + 75 * g + 15 * b, 7)
+    return bitmap_from_components_inplace_rgb565(
         bitmap,
-        lambda r, g, b: np.right_shift(50 * r + 98 * g + 24 * b, 7),
-        lambda r, g, b: np.right_shift(44 * r + 88 * g + 42 * b, 7),
-        lambda r, g, b: np.right_shift(35 * r + 69 * g + 17 * b, 7),
+        luminance,
+        np.right_shift(luminance * 113, 7),
+        np.right_shift(luminance * 88, 7),
     )
 
 
