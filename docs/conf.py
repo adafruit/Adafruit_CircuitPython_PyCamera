@@ -32,6 +32,7 @@ autodoc_mock_imports = [
     "adafruit_debouncer",
     "adafruit_display_text",
     "adafruit_lis3dh",
+    "adafruit_ticks",
     "bitmaptools",
     "busdisplay",
     "busio",
