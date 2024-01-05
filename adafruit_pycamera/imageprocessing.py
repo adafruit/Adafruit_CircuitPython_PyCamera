@@ -70,29 +70,32 @@ SIX_BITS = 0b111111
 EIGHT_BITS = 0b11111111
 
 
-def bitmap_as_array(bitmap):
+def _bitmap_as_array(bitmap):
     """Create an array object that accesses the bitmap data"""
     if bitmap.width % 2:
         raise ValueError("Can only work on even-width bitmaps")
     return np.frombuffer(bitmap, dtype=np.uint16).reshape((bitmap.height, bitmap.width))
 
 
-def array_cast(arr, dtype):
+def _array_cast(arr, dtype):
     """Cast an array to a given type and shape. The new type must match the original
     type's size in bytes."""
     return np.frombuffer(arr, dtype=dtype).reshape(arr.shape)
 
 
 def bitmap_to_components_rgb565(bitmap):
-    """Convert a RGB65_BYTESWAPPED image to int16 components in the [0,255] inclusive range
+    """Convert a RGB565_BYTESWAPPED image to int16 components in the [0,255] inclusive range
 
     This requires higher memory than uint8, but allows more arithmetic on pixel values;
-    converting back to bitmap clamps values to the appropriate range."""
-    arr = bitmap_as_array(bitmap)
+    converting back to bitmap clamps values to the appropriate range.
+
+    This only works on images whose width is a multiple of 2 pixels.
+    """
+    arr = _bitmap_as_array(bitmap)
     arr.byteswap(inplace=True)
-    r = array_cast(np.right_shift(arr, 8) & 0xF8, np.int16)
-    g = array_cast(np.right_shift(arr, 3) & 0xFC, np.int16)
-    b = array_cast(np.left_shift(arr, 3) & 0xF8, np.int16)
+    r = _array_cast(np.right_shift(arr, 8) & 0xF8, np.int16)
+    g = _array_cast(np.right_shift(arr, 3) & 0xFC, np.int16)
+    b = _array_cast(np.left_shift(arr, 3) & 0xF8, np.int16)
     arr.byteswap(inplace=True)
     return r, g, b
 
@@ -101,10 +104,10 @@ def bitmap_from_components_inplace_rgb565(
     bitmap, r, g, b
 ):  # pylint: disable=invalid-name
     """Update a bitmap in-place with new RGB values"""
-    dest = bitmap_as_array(bitmap)
-    r = array_cast(np.maximum(np.minimum(r, 255), 0), np.uint16)
-    g = array_cast(np.maximum(np.minimum(g, 255), 0), np.uint16)
-    b = array_cast(np.maximum(np.minimum(b, 255), 0), np.uint16)
+    dest = _bitmap_as_array(bitmap)
+    r = _array_cast(np.maximum(np.minimum(r, 255), 0), np.uint16)
+    g = _array_cast(np.maximum(np.minimum(g, 255), 0), np.uint16)
+    b = _array_cast(np.maximum(np.minimum(b, 255), 0), np.uint16)
     dest[:] = np.left_shift(r & 0xF8, 8)
     dest[:] |= np.left_shift(g & 0xFC, 3)
     dest[:] |= np.right_shift(b, 3)
@@ -112,16 +115,16 @@ def bitmap_from_components_inplace_rgb565(
     return bitmap
 
 
-def as_flat(arr):
-    """Flatten an array, ensuring no copy is made"""
+def _as_flat(arr):
+    """Internal routine to flatten an array, ensuring no copy is made"""
     return np.frombuffer(arr, arr.dtype)
 
 
 def buffer_from_components_rgb888(r, g, b):
     """Convert the individual color components to a single RGB888 buffer in memory"""
-    r = as_flat(r)
-    g = as_flat(g)
-    b = as_flat(b)
+    r = _as_flat(r)
+    g = _as_flat(g)
+    b = _as_flat(b)
     r = np.maximum(np.minimum(r, 0x3F), 0)
     g = np.maximum(np.minimum(g, 0x3F), 0)
     b = np.maximum(np.minimum(b, 0x3F), 0)
@@ -139,21 +142,26 @@ def symmetric_filter_inplace(data, coeffs, scale):
     many common kinds of image filters such as blur, sharpen, and edge detect.
 
     Normally, scale is sum(coeffs)."""
-    # First run the filter across each row
+    row_filter_inplace(data, coeffs, scale)
+    column_filter_inplace(data, coeffs, scale)
+
+
+def row_filter_inplace(data, coeffs, scale):
+    """Apply a filter to data in rows, changing it in place"""
     n_rows = data.shape[0]
     for i in range(n_rows):
         data[i, :] = _np_convolve_same(data[i, :], coeffs) // scale
 
-    # Run the filter across each column
+
+def column_filter_inplace(data, coeffs, scale):
+    """Apply a filter to data in columns, changing it in place"""
     n_cols = data.shape[1]
     for i in range(n_cols):
         data[:, i] = _np_convolve_same(data[:, i], coeffs) // scale
 
-    return data
-
 
 def bitmap_symmetric_filter_inplace(bitmap, coeffs, scale):
-    """Apply a symmetric filter to an image, updating the original image"""
+    """Apply the same filter to an image by rows and then by columns, updating the original image"""
     r, g, b = bitmap_to_components_rgb565(bitmap)
     symmetric_filter_inplace(r, coeffs, scale)
     symmetric_filter_inplace(g, coeffs, scale)
@@ -262,14 +270,31 @@ def sharpen(bitmap):
     )
 
 
+def _edge_filter_component(data, coefficients):
+    """Internal filter to apply H+V edge detection to an image component"""
+    data_copy = data[:]
+    row_filter_inplace(data, coefficients, scale=1)
+    column_filter_inplace(data_copy, coefficients, scale=1)
+    data += data_copy
+    data += 128
+
+
 def edgedetect(bitmap):
     """Run an edge detection routine on a bitmap"""
     coefficients = np.array([-1, 0, 1])
     r, g, b = bitmap_to_components_rgb565(bitmap)
-    symmetric_filter_inplace(r, coefficients, scale=1)
-    r += 128
-    symmetric_filter_inplace(g, coefficients, scale=1)
-    g += 128
-    symmetric_filter_inplace(b, coefficients, scale=1)
-    b += 128
+    _edge_filter_component(r, coefficients)
+    _edge_filter_component(g, coefficients)
+    _edge_filter_component(b, coefficients)
     return bitmap_from_components_inplace_rgb565(bitmap, r, g, b)
+
+
+def edgedetect_greyscale(bitmap):
+    """Run an edge detection routine on a bitmap in greyscale"""
+    coefficients = np.array([-1, 0, 1])
+    r, g, b = bitmap_to_components_rgb565(bitmap)
+    luminance = np.right_shift(38 * r + 75 * g + 15 * b, 7)
+    _edge_filter_component(luminance, coefficients)
+    return bitmap_from_components_inplace_rgb565(
+        bitmap, luminance, luminance, luminance
+    )

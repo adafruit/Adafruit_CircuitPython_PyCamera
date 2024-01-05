@@ -25,6 +25,7 @@ effects = [
     imageprocessing.blue_cast,
     imageprocessing.blur,
     imageprocessing.edgedetect,
+    imageprocessing.edgedetect_grayscale,
     imageprocessing.green_cast,
     imageprocessing.greyscale,
     imageprocessing.red_cast,
@@ -47,6 +48,15 @@ pycam.init_display()
 
 
 def load_resized_image(bitmap, filename):
+    """Load an image at the best scale into a given bitmap
+
+    If the image can be scaled down until it fits within the bitmap, this routine
+    does so, leaving equal space at the sides of the image (known as letterboxing
+    or pillarboxing).
+
+    If the image cannot be scaled down, the most central part of the image is loaded
+    into the bitmap."""
+
     print(f"loading {filename}")
     bitmap.fill(0b01000_010000_01000)  # fill with a middle grey
 

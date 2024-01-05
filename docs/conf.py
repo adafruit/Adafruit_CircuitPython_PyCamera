@@ -44,6 +44,7 @@ autodoc_mock_imports = [
     "sdcardio",
     "storage",
     "terminalio",
+    "ulab",
 ]
 
 autodoc_preserve_defaults = True
