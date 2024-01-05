@@ -28,20 +28,22 @@ extensions = [
 # digitalio, micropython and busio. List the modules you use. Without it, the
 # autodoc module docs will fail to generate with a warning.
 autodoc_mock_imports = [
-    "bitmaptools",
     "adafruit_aw9523",
+    "adafruit_debouncer",
+    "adafruit_display_text",
     "adafruit_lis3dh",
+    "bitmaptools",
+    "busdisplay",
+    "busio",
+    "digitalio",
     "displayio",
     "espcamera",
+    "fourwire",
+    "micropython",
     "neopixel",
     "sdcardio",
     "storage",
     "terminalio",
-    "adafruit_debouncer",
-    "adafruit_display_text",
-    "digitalio",
-    "busio",
-    "micropython",
 ]
 
 autodoc_preserve_defaults = True

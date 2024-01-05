@@ -17,6 +17,8 @@ import adafruit_lis3dh
 import bitmaptools
 import board
 import displayio
+import fourwire
+import busdisplay
 import espcamera
 import microcontroller
 import neopixel
@@ -71,8 +73,10 @@ _NVM_EFFECT = const(2)
 _NVM_MODE = const(3)
 
 
-class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
-    """Wrapper class for the PyCamera hardware"""
+class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
+    """Base class for PyCamera hardware"""
+
+    """Wrapper class for the PyCamera hardware with lots of smarts"""
 
     _finalize_firmware_load = (
         0x3022,
@@ -176,58 +180,40 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         b"\x29\x80\x05"  # _DISPON and Delay 5ms
     )
 
-    def i2c_scan(self):
-        """Print an I2C bus scan"""
-        while not self._i2c.try_lock():
-            pass
-
-        try:
-            print(
-                "I2C addresses found:",
-                [hex(device_address) for device_address in self._i2c.scan()],
-            )
-        finally:  # unlock the i2c bus when ctrl-c'ing out of the loop
-            self._i2c.unlock()
-
     def __init__(self) -> None:  # pylint: disable=too-many-statements
-        self._timestamp = time.monotonic()
+        displayio.release_displays()
         self._i2c = board.I2C()
         self._spi = board.SPI()
-        self.deinit_display()
-
+        self._timestamp = time.monotonic()
+        self._bigbuf = None
+        self._botbar = None
+        self._camera_device = None
+        self._display_bus = None
+        self._effect_label = None
+        self._image_counter = 0
+        self._mode_label = None
+        self._res_label = None
+        self._sd_label = None
+        self._topbar = None
+        self.accel = None
+        self.camera = None
+        self.display = None
+        self.pixels = None
+        self.sdcard = None
         self.splash = displayio.Group()
-        self._sd_label = label.Label(
-            terminalio.FONT, text="SD ??", color=0x0, x=150, y=10, scale=2
-        )
-        self._effect_label = label.Label(
-            terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2
-        )
-        self._mode_label = label.Label(
-            terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2
-        )
 
-        # turn on the display first, its reset line may be shared with the IO expander(?)
-        if not self.display:
-            self.init_display()
+        # Reset display and I/O expander
+        self._tft_aw_reset = DigitalInOut(board.TFT_RESET)
+        self._tft_aw_reset.switch_to_output(False)
+        time.sleep(0.05)
+        self._tft_aw_reset.switch_to_output(True)
 
         self.shutter_button = DigitalInOut(board.BUTTON)
         self.shutter_button.switch_to_input(Pull.UP)
         self.shutter = Button(self.shutter_button)
 
-        print("reset camera")
         self._cam_reset = DigitalInOut(board.CAMERA_RESET)
         self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
-
-        self._cam_reset.switch_to_output(False)
-        self._cam_pwdn.switch_to_output(True)
-        time.sleep(0.01)
-        self._cam_pwdn.switch_to_output(False)
-        time.sleep(0.01)
-        self._cam_reset.switch_to_output(True)
-        time.sleep(0.01)
-
-        print("pre cam @", time.monotonic() - self._timestamp)
-        self.i2c_scan()
 
         # AW9523 GPIO expander
         self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x58)
@@ -260,17 +246,39 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
 
         self.mute = make_expander_output(_AW_MUTE, False)
 
-        self.sdcard = None
-        try:
-            self.mount_sd_card()
-        except RuntimeError:
-            pass  # no card found, its ok!
-        print("sdcard done @", time.monotonic() - self._timestamp)
+    def make_camera_ui(self):
+        """Create displayio widgets for the standard camera UI"""
+        self._sd_label = label.Label(
+            terminalio.FONT, text="SD ??", color=0x0, x=150, y=10, scale=2
+        )
+        self._effect_label = label.Label(
+            terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2
+        )
+        self._mode_label = label.Label(
+            terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2
+        )
+        self._topbar = displayio.Group()
+        self._res_label = label.Label(
+            terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2
+        )
+        self._topbar.append(self._res_label)
+        self._topbar.append(self._sd_label)
 
+        self._botbar = displayio.Group(x=0, y=210)
+        self._botbar.append(self._effect_label)
+        self._botbar.append(self._mode_label)
+
+        self.splash.append(self._topbar)
+        self.splash.append(self._botbar)
+
+    def init_accelerometer(self):
+        """Initialize the accelerometer"""
         # lis3dh accelerometer
         self.accel = adafruit_lis3dh.LIS3DH_I2C(self._i2c, address=0x19)
         self.accel.range = adafruit_lis3dh.RANGE_2_G
 
+    def init_neopixel(self):
+        """Initialize the neopixels (onboard & ring)"""
         # main board neopixel
         neopix = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
         neopix.fill(0)
@@ -281,6 +289,17 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             board.A1, 8, brightness=0.1, pixel_order=neopixel.RGBW
         )
         self.pixels.fill(0)
+
+    def init_camera(self, init_autofocus=True) -> None:
+        """Initialize the camera, by default including autofocus"""
+        print("reset camera")
+        self._cam_reset.switch_to_output(False)
+        self._cam_pwdn.switch_to_output(True)
+        time.sleep(0.01)
+        self._cam_pwdn.switch_to_output(False)
+        time.sleep(0.01)
+        self._cam_reset.switch_to_output(True)
+        time.sleep(0.01)
 
         print("Initializing camera")
         self.camera = espcamera.Camera(
@@ -305,32 +324,11 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
                 self.camera.address,
             )
         )
-        print("camera done @", time.monotonic() - self._timestamp)
-        print(dir(self.camera))
 
         self._camera_device = I2CDevice(self._i2c, self.camera.address)
-        # display.auto_refresh = False
 
         self.camera.hmirror = False
         self.camera.vflip = True
-
-        self._bigbuf = None
-
-        self._topbar = displayio.Group()
-        self._res_label = label.Label(
-            terminalio.FONT, text="", color=0xFFFFFF, x=0, y=10, scale=2
-        )
-        self._topbar.append(self._res_label)
-        self._topbar.append(self._sd_label)
-
-        self._botbar = displayio.Group(x=0, y=210)
-        self._botbar.append(self._effect_label)
-        self._botbar.append(self._mode_label)
-
-        self.splash.append(self._topbar)
-        self.splash.append(self._botbar)
-        self.display.root_group = self.splash
-        self.display.refresh()
 
         self.led_color = 0
         self.led_level = 0
@@ -340,6 +338,10 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self.camera.saturation = 3
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
+
+        if init_autofocus:
+            self.autofocus_init()
+
         print("init done @", time.monotonic() - self._timestamp)
 
     def autofocus_init_from_file(self, filename):
@@ -383,9 +385,19 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             raise RuntimeError(f"Autofocus not supported on {self.camera.sensor_name}")
 
         self.write_camera_register(0x3000, 0x20)  # reset autofocus coprocessor
+        time.sleep(0.01)
 
-        for addr, val in enumerate(firmware):
-            self.write_camera_register(0x8000 + addr, val)
+        arr = bytearray(256)
+        with self._camera_device as i2c:
+            for offset in range(0, len(firmware), 254):
+                num_firmware_bytes = min(254, len(firmware) - offset)
+                reg = offset + 0x8000
+                arr[0] = reg >> 8
+                arr[1] = reg & 0xFF
+                arr[2 : 2 + num_firmware_bytes] = firmware[
+                    offset : offset + num_firmware_bytes
+                ]
+                i2c.write(arr, end=2 + num_firmware_bytes)
 
         self.write_camera_list(self._finalize_firmware_load)
         for _ in range(100):
@@ -526,26 +538,26 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
 
-    def init_display(self, reset=True):
+    def init_display(self):
         """Initialize the TFT display"""
         # construct displayio by hand
         displayio.release_displays()
-        self._display_bus = displayio.FourWire(
+        self._display_bus = fourwire.FourWire(
             self._spi,
             command=board.TFT_DC,
             chip_select=board.TFT_CS,
-            reset=board.TFT_RESET if reset else None,
+            reset=None,
             baudrate=60_000_000,
         )
-        self.display = board.DISPLAY
         # init specially since we are going to write directly below
-        self.display = displayio.Display(
+        self.display = busdisplay.BusDisplay(
             self._display_bus,
             self._INIT_SEQUENCE,
             width=240,
             height=240,
             colstart=80,
             auto_refresh=False,
+            backlight_pin=board.TFT_BACKLIGHT,
         )
         self.display.root_group = self.splash
         self.display.refresh()
@@ -562,7 +574,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
         text_area.anchor_point = (0.5, 0.5)
         if not self.display:
-            self.init_display(None)
+            self.init_display()
         text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
 
         # Show it
@@ -572,10 +584,11 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
 
     def mount_sd_card(self):
         """Attempt to mount the SD card"""
-        self._sd_label.text = "NO SD"
-        self._sd_label.color = 0xFF0000
+        if self._sd_label is not None:
+            self._sd_label.text = "NO SD"
+            self._sd_label.color = 0xFF0000
         if not self.card_detect.value:
-            raise RuntimeError("SD card detection failed")
+            raise RuntimeError("No SD card inserted")
         if self.sdcard:
             self.sdcard.deinit()
         # depower SD card
@@ -585,6 +598,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         # deinit display and SPI bus because we need to drive all SD pins LOW
         # to ensure nothing, not even an I/O pin, could possibly power the SD
         # card
+        had_display = self.display is not None
         self.deinit_display()
         self._spi.deinit()
         sckpin = DigitalInOut(board.SCK)
@@ -604,14 +618,18 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         self._card_power.value = False
         card_cs.deinit()
         print("sdcard init @", time.monotonic() - self._timestamp)
-        self.sdcard = sdcardio.SDCard(self._spi, board.CARD_CS, baudrate=20_000_000)
-        vfs = storage.VfsFat(self.sdcard)
-        print("mount vfs @", time.monotonic() - self._timestamp)
-        storage.mount(vfs, "/sd")
-        self.init_display(None)
-        self._image_counter = 0
-        self._sd_label.text = "SD OK"
-        self._sd_label.color = 0x00FF00
+        try:
+            self.sdcard = sdcardio.SDCard(self._spi, board.CARD_CS, baudrate=20_000_000)
+            vfs = storage.VfsFat(self.sdcard)
+            print("mount vfs @", time.monotonic() - self._timestamp)
+            storage.mount(vfs, "/sd")
+            self._image_counter = 0
+            if self._sd_label is not None:
+                self._sd_label.text = "SD OK"
+                self._sd_label.color = 0x00FF00
+        finally:
+            if had_display:
+                self.init_display()
 
     def unmount_sd_card(self):
         """Unmount the SD card, if mounted"""
@@ -619,8 +637,9 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             storage.umount("/sd")
         except OSError:
             pass
-        self._sd_label.text = "NO SD"
-        self._sd_label.color = 0xFF0000
+        if self._sd_label is not None:
+            self._sd_label.text = "NO SD"
+            self._sd_label.color = 0xFF0000
 
     def keys_debounce(self):
         """Debounce all keys.
@@ -733,7 +752,7 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         or the camera's capture mode is changed"""
         return self.camera.take(1)
 
-    def blit(self, bitmap):
+    def blit(self, bitmap, x_offset=0, y_offset=32):
         """Display a bitmap direct to the LCD, bypassing displayio
 
         This can be more efficient than displaying a bitmap as a displayio
@@ -744,8 +763,12 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
         for status information.
         """
 
-        self._display_bus.send(42, struct.pack(">hh", 80, 80 + bitmap.width - 1))
-        self._display_bus.send(43, struct.pack(">hh", 32, 32 + bitmap.height - 1))
+        self._display_bus.send(
+            42, struct.pack(">hh", 80 + x_offset, 80 + x_offset + bitmap.width - 1)
+        )
+        self._display_bus.send(
+            43, struct.pack(">hh", y_offset, y_offset + bitmap.height - 1)
+        )
         self._display_bus.send(44, bitmap)
 
     @property
@@ -775,3 +798,21 @@ class PyCamera:  # pylint: disable=too-many-instance-attributes,too-many-public-
             self.pixels.fill(colors)
         else:
             self.pixels[:] = colors
+
+
+class PyCamera(PyCameraBase):
+    """Wrapper class for the PyCamera hardware"""
+
+    def __init__(self, init_autofocus=True):
+        super().__init__()
+
+        self.make_camera_ui()
+        self.init_accelerometer()
+        self.init_neopixel()
+        self.init_display()
+        self.init_camera(init_autofocus)
+        try:
+            self.mount_sd_card()
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            # No SD card inserted, it's OK
+            print(exc)
