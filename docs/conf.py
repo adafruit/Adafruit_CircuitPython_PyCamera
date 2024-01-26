@@ -9,6 +9,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("mock"))
 
 # -- General configuration ------------------------------------------------
 
@@ -32,11 +33,12 @@ autodoc_mock_imports = [
     "adafruit_debouncer",
     "adafruit_display_text",
     "adafruit_lis3dh",
+    "adafruit_ticks",
     "bitmaptools",
+    "bitmapfilter",
     "busdisplay",
     "busio",
     "digitalio",
-    "displayio",
     "espcamera",
     "fourwire",
     "micropython",
@@ -44,6 +46,7 @@ autodoc_mock_imports = [
     "sdcardio",
     "storage",
     "terminalio",
+    "ulab",
 ]
 
 autodoc_preserve_defaults = True

@@ -6,3 +6,7 @@
 
 .. automodule:: adafruit_pycamera
     :members:
+.. automodule:: adafruit_pycamera.imageprocessing
+    :members:
+.. automodule:: adafruit_pycamera.ironbow
+    :members:
