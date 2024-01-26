@@ -6,6 +6,7 @@
 import displayio
 
 ironbow_palette = displayio.Palette(256)
+"""A palette often used to convert images to false color"""
 
 # fmt: off
 for i, pi in enumerate(
