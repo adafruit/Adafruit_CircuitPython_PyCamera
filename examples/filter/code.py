@@ -2,44 +2,63 @@
 #
 # SPDX-License-Identifier: Unlicense
 
-"""Image viewer
+"""Effects Demonstration
 
-This will display all *jpeg* format images on the inserted SD card, in random order.
-Each time an image is displayed, one of the pre-defined image filters is performed on it.
+This will apply a nubmer of effects to a single image.
 
-Images cycle every DISPLAY_INTERVAL milliseconds (default 8000 = 8 seconds) as long as
-they can be processed fast enough. Pressing any of the 4 direction buttons will start a
-new image processing as soon as possible.
+Press any of the directional buttons to immediately apply a new effect.
+
+Otherwise, effects cycle every DISPLAY_INTERVAL milliseconds (default 2000 = 2 seconds)
 """
 
-import time
-import os
-import random
 import displayio
 from jpegio import JpegDecoder
+from adafruit_display_text.label import Label
 from adafruit_ticks import ticks_less, ticks_ms, ticks_add, ticks_diff
-from adafruit_pycamera import PyCameraBase
+from font_free_mono_bold_24 import FONT
+import bitmapfilter
+
 from adafruit_pycamera import imageprocessing
+from adafruit_pycamera import PyCameraBase
 
 effects = [
-    imageprocessing.blue_cast,
-    imageprocessing.blur,
-    imageprocessing.edgedetect,
-    imageprocessing.edgedetect_grayscale,
-    imageprocessing.green_cast,
-    imageprocessing.greyscale,
-    imageprocessing.red_cast,
-    imageprocessing.sepia,
-    imageprocessing.sharpen,
-    imageprocessing.solarize,
+    ("blue cast", imageprocessing.blue_cast),
+    ("blur", imageprocessing.blur),
+    ("bright", lambda b: bitmapfilter.mix(b, bitmapfilter.ChannelScale(2.0, 2.0, 2.0))),
+    ("emboss", imageprocessing.emboss),
+    ("green cast", imageprocessing.green_cast),
+    ("greyscale", imageprocessing.greyscale),
+    ("ironbow", imageprocessing.ironbow),
+    (
+        "low contrast",
+        lambda b: bitmapfilter.mix(
+            b, bitmapfilter.ChannelScaleOffset(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+        ),
+    ),
+    ("negative", imageprocessing.negative),
+    ("red cast", imageprocessing.red_cast),
+    ("sepia", imageprocessing.sepia),
+    ("sharpen", imageprocessing.sharpen),
+    ("solarize", bitmapfilter.solarize),
+    (
+        "swap r/b",
+        lambda b: bitmapfilter.mix(
+            b, bitmapfilter.ChannelMixer(0, 0, 1, 0, 1, 0, 1, 0, 0)
+        ),
+    ),
 ]
 
 
-def random_choice(seq):
-    return seq[random.randrange(0, len(seq))]
+def cycle(seq):
+    while True:
+        for s in seq:
+            yield s
 
 
-DISPLAY_INTERVAL = 8000  # milliseconds
+effects_cycle = iter(cycle(effects))
+
+
+DISPLAY_INTERVAL = 2000  # milliseconds
 
 decoder = JpegDecoder()
 
@@ -47,136 +66,48 @@ pycam = PyCameraBase()
 pycam.init_display()
 
 
-def load_resized_image(bitmap, filename):
-    """Load an image at the best scale into a given bitmap
-
-    If the image can be scaled down until it fits within the bitmap, this routine
-    does so, leaving equal space at the sides of the image (known as letterboxing
-    or pillarboxing).
-
-    If the image cannot be scaled down, the most central part of the image is loaded
-    into the bitmap."""
-
-    print(f"loading {filename}")
-    bitmap.fill(0b01000_010000_01000)  # fill with a middle grey
-
-    bw, bh = bitmap.width, bitmap.height
-    t0 = ticks_ms()
-    h, w = decoder.open(filename)
-    t1 = ticks_ms()
-    print(f"{ticks_diff(t1, t0)}ms to open")
-    scale = 0
-    print(f"Full image size is {w}x{h}")
-    print(f"Bitmap is {bw}x{bh} pixels")
-    while (w >> scale) > bw or (h >> scale) > bh and scale < 3:
-        scale += 1
-    sw = w >> scale
-    sh = h >> scale
-    print(f"will load at {scale=}, giving {sw}x{sh} pixels")
-
-    if sw > bw:  # left/right sides cut off
-        x = 0
-        x1 = (sw - bw) // 2
-    else:  # horizontally centered
-        x = (bw - sw) // 2
-        x1 = 0
-
-    if sh > bh:  # top/bottom sides cut off
-        y = 0
-        y1 = (sh - bh) // 2
-    else:  # vertically centered
-        y = (bh - sh) // 2
-        y1 = 0
-
-    print(f"{x=} {y=} {x1=} {y1=}")
-    decoder.decode(bitmap, x=x, y=y, x1=x1, y1=y1, scale=scale)
-    t1 = ticks_ms()
-    print(f"{ticks_diff(t1, t0)}ms to decode")
-
-
-def mount_sd():
-    if not pycam.card_detect.value:
-        pycam.display_message("No SD card\ninserted", color=0xFF0000)
-        return []
-    pycam.display_message("Mounting\nSD Card", color=0xFFFFFF)
-    for _ in range(3):
-        try:
-            print("Mounting card")
-            pycam.mount_sd_card()
-            print("Success!")
-            break
-        except OSError as e:
-            print("Retrying!", e)
-            time.sleep(0.5)
-    else:
-        pycam.display_message("SD Card\nFailed!", color=0xFF0000)
-        time.sleep(0.5)
-    all_images = [
-        f"/sd/{filename}"
-        for filename in os.listdir("/sd")
-        if filename.lower().endswith(".jpg")
-    ]
-    pycam.display_message(f"Found {len(all_images)}\nimages", color=0xFFFFFF)
-    time.sleep(0.5)
-    pycam.display.refresh()
-    return all_images
-
-
 def main():
+    filename = "/cornell_box_208x208.jpg"
+
+    bitmap = displayio.Bitmap(208, 208, 65535)
+    bitmap0 = displayio.Bitmap(208, 208, 65535)
+    decoder.open(filename)
+    decoder.decode(bitmap0)
+
+    label = Label(font=FONT, x=0, y=8)
+    pycam.display.root_group = label
+    pycam.display.refresh()
+
     deadline = ticks_ms()
-    all_images = mount_sd()
-
-    bitmap = displayio.Bitmap(pycam.display.width, pycam.display.height - 32, 65535)
-
     while True:
-        pycam.keys_debounce()
-        if pycam.card_detect.fell:
-            print("SD card removed")
-            pycam.unmount_sd_card()
-            pycam.display_message("SD Card\nRemoved", color=0xFFFFFF)
-            time.sleep(0.5)
-            pycam.display.refresh()
-            all_images = []
-
         now = ticks_ms()
-        if pycam.card_detect.rose:
-            print("SD card inserted")
-            all_images = mount_sd()
+        if pycam.up.fell:
             deadline = now
 
-        if all_images:
-            if pycam.up.fell:
-                deadline = now
+        if pycam.down.fell:
+            deadline = now
 
-            if pycam.down.fell:
-                deadline = now
+        if pycam.left.fell:
+            deadline = now
 
-            if pycam.left.fell:
-                deadline = now
+        if pycam.right.fell:
+            deadline = now
 
-            if pycam.right.fell:
-                deadline = now
+        if ticks_less(deadline, now):
+            memoryview(bitmap)[:] = memoryview(bitmap0)
+            deadline = ticks_add(deadline, DISPLAY_INTERVAL)
 
-            if ticks_less(deadline, now):
-                print(now, deadline, ticks_less(deadline, now), all_images)
-                deadline = ticks_add(deadline, DISPLAY_INTERVAL)
-                filename = random_choice(all_images)
-                effect = random.choice(effects)
-                try:
-                    load_resized_image(bitmap, filename)
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    pycam.display_message(f"Failed to read\n{filename}", color=0xFF0000)
-                    print(e)
-                    deadline = ticks_add(now, 0)
-                try:
-                    print(f"applying {effect=}")
-                    t0 = ticks_ms()
-                    bitmap = effect(bitmap)
-                    t1 = ticks_ms()
-                    print(f"{ticks_diff(t1, t0)}ms to apply effect")
-                except MemoryError as e:
-                    print(e)
-                pycam.blit(bitmap)
+            effect_name, effect = next(effects_cycle)  # random.choice(effects)
+            print(effect)
+            print(f"applying {effect=}")
+            t0 = ticks_ms()
+            effect(bitmap)
+            t1 = ticks_ms()
+            dt = ticks_diff(t1, t0)
+            print(f"{dt}ms to apply effect")
+            pycam.blit(bitmap, x_offset=16)
+            label.text = f"{dt:4}ms: {effect_name}"
+            pycam.display.refresh()
 
 
 main()
