@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Unlicense
 
 import time
-
+import math
 import bitmaptools
 import displayio
 import gifio
@@ -22,6 +22,7 @@ print("Starting!")
 last_frame = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 onionskin = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 timelapse_remaining = None
+timelapse_timestamp = None
 
 while True:
     if pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0:
@@ -41,10 +42,24 @@ while True:
         pycam._timelapse_rate_label.text = pycam._timelapse_rate_label.text
         if timelapse_remaining is None:
             pycam._timelapsestatus_label.text = "STOP"
-            #pycam.display_message("Timelapse\nNot Running\nPress Select to set timing")
         else:
-            pycam.display_message("%d Seconds left", timelapse_remaining)
+            timelapse_remaining = timelapse_timestamp - time.time()
+            pycam._timelapsestatus_label.text = f"{timelapse_remaining}s /    "
         pycam.display.refresh()
+
+        if timelapse_remaining is not None and timelapse_remaining <= 0:
+            #pycam.tone(200, 0.1) # uncomment to add a beep when a photo is taken
+            try:
+                pycam.display_message("Snap!", color=0x0000FF)
+                pycam.capture_jpeg()
+            except TypeError as e:
+                pycam.display_message("Failed", color=0xFF0000)
+                time.sleep(0.5)
+            except RuntimeError as e:
+                pycam.display_message("Error\nNo SD Card", color=0xFF0000)
+                time.sleep(0.5)
+            pycam.live_preview_mode()
+            timelapse_timestamp = time.time() + pycam.timelapse_rates[pycam.timelapse_rate] + 1
     else:
         pycam.blit(pycam.continuous_capture())
     # print("\t\t", capture_time, blit_time)
@@ -193,3 +208,9 @@ while True:
         print("SEL")
     if pycam.ok.fell:
         print("OK")
+        if pycam.mode_text == "LAPS":
+            if timelapse_remaining is None: # stopped
+                timelapse_remaining = pycam.timelapse_rates[pycam.timelapse_rate]
+                timelapse_timestamp = time.time() + timelapse_remaining + 1
+            else: # is running, turn off
+                timelapse_remaining = None

@@ -289,11 +289,13 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
 
         self._timelapsebar = displayio.Group(x=0, y=180)
         self._timelapse_rate_label = label.Label(
-            terminalio.FONT, text="Time", color=0xFFFFFF, x=150, y=10, scale=2
+            terminalio.FONT, text="Time", color=0xFFFFFF,x=90, y=10, scale=2
         )
+        self._timelapse_rate_label.background_color = None
         self._timelapsestatus_label = label.Label(
             terminalio.FONT, text="Status", color=0xFFFFFF, x=0, y=10, scale=2
         )
+        self._timelapsestatus_label.background_color = None
         self._timelapsebar.append(self._timelapse_rate_label)
         self._timelapsebar.append(self._timelapsestatus_label)
         
@@ -493,7 +495,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
         self._timelapse_rate_label.color = 0xFFFFFF
-        self._timelapse_rate_label.background_color = 0x0
+        self._timelapse_rate_label.background_color = None
         
         if setting_name == "effect":
             self._effect_label.color = 0x0
