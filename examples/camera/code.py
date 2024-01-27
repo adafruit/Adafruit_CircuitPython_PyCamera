@@ -38,16 +38,26 @@ while True:
         )
         pycam.blit(last_frame)
     elif pycam.mode_text == "LAPS":
-        pycam.blit(pycam.continuous_capture())
-        pycam._timelapse_rate_label.text = pycam._timelapse_rate_label.text
         if timelapse_remaining is None:
             pycam._timelapsestatus_label.text = "STOP"
         else:
             timelapse_remaining = timelapse_timestamp - time.time()
             pycam._timelapsestatus_label.text = f"{timelapse_remaining}s /    "
+        pycam._timelapse_rate_label.text = pycam._timelapse_rate_label.text
+        pycam._timelapse_submode_label.text = pycam._timelapse_submode_label.text
+
+        # only in high power mode do we continuously preview
+        if (timelapse_remaining is None) or (pycam._timelapse_submode_label.text == "HiPwr"):
+            pycam.blit(pycam.continuous_capture())
+        if pycam._timelapse_submode_label.text == "LowPwr" and (timelapse_remaining is not None):
+            pycam.display.brightness = 0.05
+        else:
+            pycam.display.brightness = 1
         pycam.display.refresh()
 
         if timelapse_remaining is not None and timelapse_remaining <= 0:
+            # no matter what, show what was just on the camera
+            pycam.blit(pycam.continuous_capture())
             #pycam.tone(200, 0.1) # uncomment to add a beep when a photo is taken
             try:
                 pycam.display_message("Snap!", color=0x0000FF)
@@ -59,6 +69,8 @@ while True:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
             pycam.live_preview_mode()
+            pycam.display.refresh()
+            pycam.blit(pycam.continuous_capture())
             timelapse_timestamp = time.time() + pycam.timelapse_rates[pycam.timelapse_rate] + 1
     else:
         pycam.blit(pycam.continuous_capture())
@@ -206,6 +218,9 @@ while True:
         # pycam.set_resolution(pycam.resolutions[new_res])
     if pycam.select.fell:
         print("SEL")
+        if pycam.mode_text == "LAPS":
+            pycam.timelapse_submode += 1
+            pycam.display.refresh()
     if pycam.ok.fell:
         print("OK")
         if pycam.mode_text == "LAPS":

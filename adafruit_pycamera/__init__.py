@@ -72,6 +72,7 @@ _NVM_RESOLUTION = const(1)
 _NVM_EFFECT = const(2)
 _NVM_MODE = const(3)
 _NVM_TIMELAPSE_RATE = const(4)
+_NVM_TIMELAPSE_SUBMODE = const(5)
 
 
 class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
@@ -186,6 +187,12 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         60 * 30,
         60 * 60
     )
+
+    timelapse_submodes = (
+        "HiPwr",
+        "MedPwr",
+        "LowPwr"
+    )
         
     modes = ("JPEG", "GIF", "GBOY", "STOP", "LAPS")
 
@@ -288,16 +295,18 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._botbar.append(self._mode_label)
 
         self._timelapsebar = displayio.Group(x=0, y=180)
+        self._timelapse_submode_label = label.Label(
+            terminalio.FONT, text="SubM", color=0xFFFFFF,x=160, y=10, scale=2
+        )
         self._timelapse_rate_label = label.Label(
             terminalio.FONT, text="Time", color=0xFFFFFF,x=90, y=10, scale=2
         )
-        self._timelapse_rate_label.background_color = None
         self._timelapsestatus_label = label.Label(
             terminalio.FONT, text="Status", color=0xFFFFFF, x=0, y=10, scale=2
         )
-        self._timelapsestatus_label.background_color = None
         self._timelapsebar.append(self._timelapse_rate_label)
         self._timelapsebar.append(self._timelapsestatus_label)
+        self._timelapsebar.append(self._timelapse_submode_label)
         
         self.splash.append(self._topbar)
         self.splash.append(self._botbar)
@@ -371,6 +380,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
         self.timelapse_rate = microcontroller.nvm[_NVM_TIMELAPSE_RATE]
+        self.timelapse_submode = microcontroller.nvm[_NVM_TIMELAPSE_SUBMODE]
 
         if init_autofocus:
             self.autofocus_init()
@@ -598,6 +608,18 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         microcontroller.nvm[_NVM_TIMELAPSE_RATE] = setting
         self.display.refresh()
 
+
+    @property
+    def timelapse_submode(self):
+        """Get or set the power mode for timelapsing"""
+        return self._timelapse_submode
+
+    @timelapse_submode.setter
+    def timelapse_submode(self, setting):
+        setting = (setting + len(self.timelapse_submodes)) % len(self.timelapse_submodes)
+        self._timelapse_submode = setting
+        self._timelapse_submode_label.text = self.timelapse_submodes[self._timelapse_submode]
+        microcontroller.nvm[_NVM_TIMELAPSE_SUBMODE] = setting
 
     def init_display(self):
         """Initialize the TFT display"""
