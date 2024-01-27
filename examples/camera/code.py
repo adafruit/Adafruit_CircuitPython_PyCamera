@@ -158,15 +158,15 @@ while True:
         key = settings[curr_setting]
         if key:
             setattr(pycam, key, getattr(pycam, key) - 1)
-    if pycam.left.fell:
-        print("LF")
+    if pycam.right.fell:
+        print("RT")
         curr_setting = (curr_setting + 1) % len(settings)
         print(settings[curr_setting])
         # new_res = min(len(pycam.resolutions)-1, pycam.get_resolution()+1)
         # pycam.set_resolution(pycam.resolutions[new_res])
         pycam.select_setting(settings[curr_setting])
-    if pycam.right.fell:
-        print("RT")
+    if pycam.left.fell:
+        print("LF")
         curr_setting = (curr_setting - 1 + len(settings)) % len(settings)
         print(settings[curr_setting])
         pycam.select_setting(settings[curr_setting])
