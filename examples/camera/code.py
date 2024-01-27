@@ -14,13 +14,15 @@ import adafruit_pycamera
 pycam = adafruit_pycamera.PyCamera()
 # pycam.live_preview_mode()
 
-settings = (None, "resolution", "effect", "mode", "led_level", "led_color")
+settings = (None, "resolution", "effect", "mode", "led_level", "led_color", "timelapse_rate")
 curr_setting = 0
 
 print("Starting!")
 # pycam.tone(200, 0.1)
 last_frame = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
 onionskin = displayio.Bitmap(pycam.camera.width, pycam.camera.height, 65535)
+timelapse_remaining = None
+
 while True:
     if pycam.mode_text == "STOP" and pycam.stop_motion_frame != 0:
         # alpha blend
@@ -34,6 +36,15 @@ while True:
             last_frame, pycam.continuous_capture(), displayio.Colorspace.RGB565_SWAPPED
         )
         pycam.blit(last_frame)
+    elif pycam.mode_text == "LAPS":
+        pycam.blit(pycam.continuous_capture())
+        pycam._timelapse_rate_label.text = pycam._timelapse_rate_label.text
+        if timelapse_remaining is None:
+            pycam._timelapsestatus_label.text = "STOP"
+            #pycam.display_message("Timelapse\nNot Running\nPress Select to set timing")
+        else:
+            pycam.display_message("%d Seconds left", timelapse_remaining)
+        pycam.display.refresh()
     else:
         pycam.blit(pycam.continuous_capture())
     # print("\t\t", capture_time, blit_time)
@@ -127,6 +138,7 @@ while True:
             except RuntimeError as e:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
+
     if pycam.card_detect.fell:
         print("SD card removed")
         pycam.unmount_sd_card()
@@ -152,6 +164,7 @@ while True:
         print("UP")
         key = settings[curr_setting]
         if key:
+            print("getting", key, getattr(pycam, key))
             setattr(pycam, key, getattr(pycam, key) + 1)
     if pycam.down.fell:
         print("DN")
@@ -161,6 +174,8 @@ while True:
     if pycam.right.fell:
         print("RT")
         curr_setting = (curr_setting + 1) % len(settings)
+        if pycam.mode_text != "LAPS" and settings[curr_setting] == "timelapse_rate":
+            curr_setting = (curr_setting + 1) % len(settings)
         print(settings[curr_setting])
         # new_res = min(len(pycam.resolutions)-1, pycam.get_resolution()+1)
         # pycam.set_resolution(pycam.resolutions[new_res])
@@ -168,6 +183,8 @@ while True:
     if pycam.left.fell:
         print("LF")
         curr_setting = (curr_setting - 1 + len(settings)) % len(settings)
+        if pycam.mode_text != "LAPS" and settings[curr_setting] == "timelaps_rate":
+            curr_setting = (curr_setting + 1) % len(settings)
         print(settings[curr_setting])
         pycam.select_setting(settings[curr_setting])
         # new_res = max(1, pycam.get_resolution()-1)

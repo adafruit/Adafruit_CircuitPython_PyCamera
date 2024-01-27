@@ -71,6 +71,7 @@ _AW_OK = const(11)
 _NVM_RESOLUTION = const(1)
 _NVM_EFFECT = const(2)
 _NVM_MODE = const(3)
+_NVM_TIMELAPSE_RATE = const(4)
 
 
 class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
@@ -168,7 +169,25 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         "Sepia",
         "Solarize",
     )
-    modes = ("JPEG", "GIF", "GBOY", "STOP")
+
+    timelapse_rates = (
+        5,
+        10,
+        20,
+        30,
+        60,
+        90,
+        60 * 2,
+        60 * 3,
+        60 * 4,
+        60 * 5,
+        60 * 10,
+        60 * 15,
+        60 * 30,
+        60 * 60
+    )
+        
+    modes = ("JPEG", "GIF", "GBOY", "STOP", "LAPS")
 
     _INIT_SEQUENCE = (
         b"\x01\x80\x78"  # _SWRESET and Delay 120ms
@@ -249,13 +268,13 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
     def make_camera_ui(self):
         """Create displayio widgets for the standard camera UI"""
         self._sd_label = label.Label(
-            terminalio.FONT, text="SD ??", color=0x0, x=150, y=10, scale=2
+            terminalio.FONT, text="SD ??", color=0x0, x=170, y=10, scale=2
         )
         self._effect_label = label.Label(
             terminalio.FONT, text="EFFECT", color=0xFFFFFF, x=4, y=10, scale=2
         )
         self._mode_label = label.Label(
-            terminalio.FONT, text="MODE", color=0xFFFFFF, x=150, y=10, scale=2
+            terminalio.FONT, text="MODE", color=0xFFFFFF, x=170, y=10, scale=2
         )
         self._topbar = displayio.Group()
         self._res_label = label.Label(
@@ -268,8 +287,19 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._botbar.append(self._effect_label)
         self._botbar.append(self._mode_label)
 
+        self._timelapsebar = displayio.Group(x=0, y=180)
+        self._timelapse_rate_label = label.Label(
+            terminalio.FONT, text="Time", color=0xFFFFFF, x=150, y=10, scale=2
+        )
+        self._timelapsestatus_label = label.Label(
+            terminalio.FONT, text="Status", color=0xFFFFFF, x=0, y=10, scale=2
+        )
+        self._timelapsebar.append(self._timelapse_rate_label)
+        self._timelapsebar.append(self._timelapsestatus_label)
+        
         self.splash.append(self._topbar)
         self.splash.append(self._botbar)
+        self.splash.append(self._timelapsebar)
 
     def init_accelerometer(self):
         """Initialize the accelerometer"""
@@ -338,6 +368,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.camera.saturation = 3
         self.resolution = microcontroller.nvm[_NVM_RESOLUTION]
         self.mode = microcontroller.nvm[_NVM_MODE]
+        self.timelapse_rate = microcontroller.nvm[_NVM_TIMELAPSE_RATE]
 
         if init_autofocus:
             self.autofocus_init()
@@ -461,6 +492,9 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self._res_label.text = self.resolutions[self._resolution]
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
+        self._timelapse_rate_label.color = 0xFFFFFF
+        self._timelapse_rate_label.background_color = 0x0
+        
         if setting_name == "effect":
             self._effect_label.color = 0x0
             self._effect_label.background_color = 0xFFFFFF
@@ -478,6 +512,13 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self._res_label.text = "LED CLR"
             self._res_label.color = 0x0
             self._res_label.background_color = 0xFFFFFF
+        elif setting_name == "led_color":
+            self._res_label.text = "LED CLR"
+            self._res_label.color = 0x0
+            self._res_label.background_color = 0xFFFFFF
+        elif setting_name == "timelapse_rate":
+            self._timelapse_rate_label.color = 0x0
+            self._timelapse_rate_label.background_color = 0xFFFFFF
         self.display.refresh()
 
     @property
@@ -537,6 +578,24 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self._resolution = res
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
+
+
+    @property
+    def timelapse_rate(self):
+        """Get or set the amount of time between timelapse shots"""
+        return self._timelapse_rate
+
+    @timelapse_rate.setter
+    def timelapse_rate(self, setting):
+        setting = (setting + len(self.timelapse_rates)) % len(self.timelapse_rates)
+        self._timelapse_rate = setting
+        if self.timelapse_rates[setting] < 60:
+            self._timelapse_rate_label.text = "%d S" % self.timelapse_rates[setting]
+        else:
+            self._timelapse_rate_label.text = "%d M" % (self.timelapse_rates[setting] / 60)
+        microcontroller.nvm[_NVM_TIMELAPSE_RATE] = setting
+        self.display.refresh()
+
 
     def init_display(self):
         """Initialize the TFT display"""
