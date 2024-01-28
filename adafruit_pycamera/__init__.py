@@ -882,6 +882,55 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         else:
             self.pixels[:] = colors
 
+    def get_camera_autosettings(self):
+        exposure = (self.read_camera_register(0x3500) << 12) + \
+                  (self.read_camera_register(0x3501) << 4) + \
+                  (self.read_camera_register(0x3502) >> 4);
+        wb = [self.read_camera_register(x) for x in \
+              (0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405)]
+                
+        settings = {
+            'gain': self.read_camera_register(0x350b),
+            'exposure': exposure,
+            'wb': wb
+            }
+        return settings
+
+    def set_camera_wb(self, wb_register_values=None):
+        if wb_register_values is None:
+            # just set to auto balance
+            self.camera.whitebal = True
+            return
+        
+        if len(wb_register_values) != 6:
+            raise RuntimeError("Please pass in 0x3400~0x3405 inclusive!")
+
+        self.write_camera_register(0x3212, 0x03)
+        self.write_camera_register(0x3406, 0x01)
+        for i, reg_val in enumerate(wb_register_values):
+            self.write_camera_register(0x3400+i, reg_val)
+        self.write_camera_register(0x3212, 0x13)
+        self.write_camera_register(0x3212, 0xa3)
+
+    def set_camera_exposure(self, new_exposure=None):
+        if new_exposure is None:
+            # just set auto expose
+            self.camera.exposure_ctrl = True
+            return
+        exposure_ctrl = False
+
+        self.write_camera_register(0x3500, (new_exposure >> 12) & 0xFF)
+        self.write_camera_register(0x3501, (new_exposure >> 4) & 0xFF)
+        self.write_camera_register(0x3502, (new_exposure << 4) & 0xFF)
+        
+    def set_camera_gain(self, new_gain=None):
+        if new_gain is None:
+            # just set auto expose
+            self.camera.gain_ctrl = True
+            return
+
+        self.camera.gain_ctrl = False
+        self.write_camera_register(0x350b, new_gain)
 
 class PyCamera(PyCameraBase):
     """Wrapper class for the PyCamera hardware"""

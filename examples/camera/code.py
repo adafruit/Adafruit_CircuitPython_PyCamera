@@ -225,7 +225,20 @@ while True:
         print("OK")
         if pycam.mode_text == "LAPS":
             if timelapse_remaining is None: # stopped
+                print("Starting timelapse")
                 timelapse_remaining = pycam.timelapse_rates[pycam.timelapse_rate]
                 timelapse_timestamp = time.time() + timelapse_remaining + 1
+                # dont let the camera take over auto-settings
+                saved_settings = pycam.get_camera_autosettings()
+                #print(f"Current exposure {saved_settings['exposure']}, gain {saved_settings['gain']}, wb {saved_settings['wb']}")
+                pycam.set_camera_exposure(saved_settings['exposure'])
+                pycam.set_camera_gain(saved_settings['gain'])
+                pycam.set_camera_wb(saved_settings['wb'])
             else: # is running, turn off
+                print("Stopping timelapse")
+
                 timelapse_remaining = None
+                pycam.camera.exposure_ctrl = True
+                pycam.set_camera_gain(None) # go back to autogain
+                pycam.set_camera_wb(None) # go back to autobalance
+                pycam.set_camera_exposure(None) # go back to auto shutter
