@@ -935,7 +935,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         The argument of `None` selects auto exposure.
 
         Otherwise, the new exposure data should come from
-        ``get_camera_autosettings()["exposure"]."""
+        ``get_camera_autosettings()["exposure"]``."""
         if new_exposure is None:
             # just set auto expose
             self.camera.exposure_ctrl = True
@@ -952,7 +952,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         The argument of `None` selects auto gain control.
 
         Otherwise, the new exposure data should come from
-        ``get_camera_autosettings()["gain"]."""
+        ``get_camera_autosettings()["gain"]``."""
         if new_gain is None:
             # just set auto expose
             self.camera.gain_ctrl = True
