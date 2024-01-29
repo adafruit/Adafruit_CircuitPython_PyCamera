@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Unlicense
 
 import time
-import math
 import bitmaptools
 import displayio
 import gifio
@@ -14,7 +13,15 @@ import adafruit_pycamera
 pycam = adafruit_pycamera.PyCamera()
 # pycam.live_preview_mode()
 
-settings = (None, "resolution", "effect", "mode", "led_level", "led_color", "timelapse_rate")
+settings = (
+    None,
+    "resolution",
+    "effect",
+    "mode",
+    "led_level",
+    "led_color",
+    "timelapse_rate",
+)
 curr_setting = 0
 
 print("Starting!")
@@ -39,17 +46,23 @@ while True:
         pycam.blit(last_frame)
     elif pycam.mode_text == "LAPS":
         if timelapse_remaining is None:
-            pycam._timelapsestatus_label.text = "STOP"
+            pycam.timelapsestatus_label.text = "STOP"
         else:
             timelapse_remaining = timelapse_timestamp - time.time()
-            pycam._timelapsestatus_label.text = f"{timelapse_remaining}s /    "
-        pycam._timelapse_rate_label.text = pycam._timelapse_rate_label.text
-        pycam._timelapse_submode_label.text = pycam._timelapse_submode_label.text
+            pycam.timelapsestatus_label.text = f"{timelapse_remaining}s /    "
+        # Manually updating the label text a second time ensures that the label
+        # is re-painted over the blitted preview.
+        pycam.timelapse_rate_label.text = pycam.timelapse_rate_label.text
+        pycam.timelapse_submode_label.text = pycam.timelapse_submode_label.text
 
         # only in high power mode do we continuously preview
-        if (timelapse_remaining is None) or (pycam._timelapse_submode_label.text == "HiPwr"):
+        if (timelapse_remaining is None) or (
+            pycam.timelapse_submode_label.text == "HiPwr"
+        ):
             pycam.blit(pycam.continuous_capture())
-        if pycam._timelapse_submode_label.text == "LowPwr" and (timelapse_remaining is not None):
+        if pycam.timelapse_submode_label.text == "LowPwr" and (
+            timelapse_remaining is not None
+        ):
             pycam.display.brightness = 0.05
         else:
             pycam.display.brightness = 1
@@ -58,7 +71,7 @@ while True:
         if timelapse_remaining is not None and timelapse_remaining <= 0:
             # no matter what, show what was just on the camera
             pycam.blit(pycam.continuous_capture())
-            #pycam.tone(200, 0.1) # uncomment to add a beep when a photo is taken
+            # pycam.tone(200, 0.1) # uncomment to add a beep when a photo is taken
             try:
                 pycam.display_message("Snap!", color=0x0000FF)
                 pycam.capture_jpeg()
@@ -71,7 +84,9 @@ while True:
             pycam.live_preview_mode()
             pycam.display.refresh()
             pycam.blit(pycam.continuous_capture())
-            timelapse_timestamp = time.time() + pycam.timelapse_rates[pycam.timelapse_rate] + 1
+            timelapse_timestamp = (
+                time.time() + pycam.timelapse_rates[pycam.timelapse_rate] + 1
+            )
     else:
         pycam.blit(pycam.continuous_capture())
     # print("\t\t", capture_time, blit_time)
@@ -224,21 +239,21 @@ while True:
     if pycam.ok.fell:
         print("OK")
         if pycam.mode_text == "LAPS":
-            if timelapse_remaining is None: # stopped
+            if timelapse_remaining is None:  # stopped
                 print("Starting timelapse")
                 timelapse_remaining = pycam.timelapse_rates[pycam.timelapse_rate]
                 timelapse_timestamp = time.time() + timelapse_remaining + 1
                 # dont let the camera take over auto-settings
                 saved_settings = pycam.get_camera_autosettings()
-                #print(f"Current exposure {saved_settings['exposure']}, gain {saved_settings['gain']}, wb {saved_settings['wb']}")
-                pycam.set_camera_exposure(saved_settings['exposure'])
-                pycam.set_camera_gain(saved_settings['gain'])
-                pycam.set_camera_wb(saved_settings['wb'])
-            else: # is running, turn off
+                # print(f"Current exposure {saved_settings=}")
+                pycam.set_camera_exposure(saved_settings["exposure"])
+                pycam.set_camera_gain(saved_settings["gain"])
+                pycam.set_camera_wb(saved_settings["wb"])
+            else:  # is running, turn off
                 print("Stopping timelapse")
 
                 timelapse_remaining = None
                 pycam.camera.exposure_ctrl = True
-                pycam.set_camera_gain(None) # go back to autogain
-                pycam.set_camera_wb(None) # go back to autobalance
-                pycam.set_camera_exposure(None) # go back to auto shutter
+                pycam.set_camera_gain(None)  # go back to autogain
+                pycam.set_camera_wb(None)  # go back to autobalance
+                pycam.set_camera_exposure(None)  # go back to auto shutter

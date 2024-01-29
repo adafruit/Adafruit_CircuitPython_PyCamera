@@ -185,15 +185,11 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         60 * 10,
         60 * 15,
         60 * 30,
-        60 * 60
+        60 * 60,
     )
 
-    timelapse_submodes = (
-        "HiPwr",
-        "MedPwr",
-        "LowPwr"
-    )
-        
+    timelapse_submodes = ("HiPwr", "MedPwr", "LowPwr")
+
     modes = ("JPEG", "GIF", "GBOY", "STOP", "LAPS")
 
     _INIT_SEQUENCE = (
@@ -213,6 +209,11 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._timestamp = time.monotonic()
         self._bigbuf = None
         self._botbar = None
+        self._timelapsebar = None
+        self.timelapse_rate_label = None
+        self._timelapsestatus = None
+        self.timelapsestatus_label = None
+        self.timelapse_submode_label = None
         self._camera_device = None
         self._display_bus = None
         self._effect_label = None
@@ -295,19 +296,19 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._botbar.append(self._mode_label)
 
         self._timelapsebar = displayio.Group(x=0, y=180)
-        self._timelapse_submode_label = label.Label(
-            terminalio.FONT, text="SubM", color=0xFFFFFF,x=160, y=10, scale=2
+        self.timelapse_submode_label = label.Label(
+            terminalio.FONT, text="SubM", color=0xFFFFFF, x=160, y=10, scale=2
         )
-        self._timelapse_rate_label = label.Label(
-            terminalio.FONT, text="Time", color=0xFFFFFF,x=90, y=10, scale=2
+        self.timelapse_rate_label = label.Label(
+            terminalio.FONT, text="Time", color=0xFFFFFF, x=90, y=10, scale=2
         )
-        self._timelapsestatus_label = label.Label(
+        self.timelapsestatus_label = label.Label(
             terminalio.FONT, text="Status", color=0xFFFFFF, x=0, y=10, scale=2
         )
-        self._timelapsebar.append(self._timelapse_rate_label)
-        self._timelapsebar.append(self._timelapsestatus_label)
-        self._timelapsebar.append(self._timelapse_submode_label)
-        
+        self._timelapsebar.append(self.timelapse_rate_label)
+        self._timelapsebar.append(self.timelapsestatus_label)
+        self._timelapsebar.append(self.timelapse_submode_label)
+
         self.splash.append(self._topbar)
         self.splash.append(self._botbar)
         self.splash.append(self._timelapsebar)
@@ -504,9 +505,9 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self._res_label.text = self.resolutions[self._resolution]
         self._mode_label.color = 0xFFFFFF
         self._mode_label.background_color = 0x0
-        self._timelapse_rate_label.color = 0xFFFFFF
-        self._timelapse_rate_label.background_color = None
-        
+        self.timelapse_rate_label.color = 0xFFFFFF
+        self.timelapse_rate_label.background_color = None
+
         if setting_name == "effect":
             self._effect_label.color = 0x0
             self._effect_label.background_color = 0xFFFFFF
@@ -529,8 +530,8 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self._res_label.color = 0x0
             self._res_label.background_color = 0xFFFFFF
         elif setting_name == "timelapse_rate":
-            self._timelapse_rate_label.color = 0x0
-            self._timelapse_rate_label.background_color = 0xFFFFFF
+            self.timelapse_rate_label.color = 0x0
+            self.timelapse_rate_label.background_color = 0xFFFFFF
         self.display.refresh()
 
     @property
@@ -591,7 +592,6 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self._res_label.text = self.resolutions[res]
         self.display.refresh()
 
-
     @property
     def timelapse_rate(self):
         """Get or set the amount of time between timelapse shots"""
@@ -602,12 +602,13 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         setting = (setting + len(self.timelapse_rates)) % len(self.timelapse_rates)
         self._timelapse_rate = setting
         if self.timelapse_rates[setting] < 60:
-            self._timelapse_rate_label.text = "%d S" % self.timelapse_rates[setting]
+            self.timelapse_rate_label.text = "%d S" % self.timelapse_rates[setting]
         else:
-            self._timelapse_rate_label.text = "%d M" % (self.timelapse_rates[setting] / 60)
+            self.timelapse_rate_label.text = "%d M" % (
+                self.timelapse_rates[setting] / 60
+            )
         microcontroller.nvm[_NVM_TIMELAPSE_RATE] = setting
         self.display.refresh()
-
 
     @property
     def timelapse_submode(self):
@@ -616,9 +617,13 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
 
     @timelapse_submode.setter
     def timelapse_submode(self, setting):
-        setting = (setting + len(self.timelapse_submodes)) % len(self.timelapse_submodes)
+        setting = (setting + len(self.timelapse_submodes)) % len(
+            self.timelapse_submodes
+        )
         self._timelapse_submode = setting
-        self._timelapse_submode_label.text = self.timelapse_submodes[self._timelapse_submode]
+        self.timelapse_submode_label.text = self.timelapse_submodes[
+            self._timelapse_submode
+        ]
         microcontroller.nvm[_NVM_TIMELAPSE_SUBMODE] = setting
 
     def init_display(self):
@@ -883,54 +888,79 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             self.pixels[:] = colors
 
     def get_camera_autosettings(self):
-        exposure = (self.read_camera_register(0x3500) << 12) + \
-                  (self.read_camera_register(0x3501) << 4) + \
-                  (self.read_camera_register(0x3502) >> 4);
-        wb = [self.read_camera_register(x) for x in \
-              (0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405)]
-                
+        """Collect all the settings related to exposure and white balance"""
+        exposure = (
+            (self.read_camera_register(0x3500) << 12)
+            + (self.read_camera_register(0x3501) << 4)
+            + (self.read_camera_register(0x3502) >> 4)
+        )
+        white_balance = [
+            self.read_camera_register(x)
+            for x in (0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405)
+        ]
+
         settings = {
-            'gain': self.read_camera_register(0x350b),
-            'exposure': exposure,
-            'wb': wb
-            }
+            "gain": self.read_camera_register(0x350B),
+            "exposure": exposure,
+            "wb": white_balance,
+        }
         return settings
 
     def set_camera_wb(self, wb_register_values=None):
+        """Set the camera white balance.
+
+        The argument of `None` selects auto white balance, while
+        a list of 6 numbers sets a specific white balance.
+
+        The numbers can come from the datasheet or from
+        ``get_camera_autosettings()["wb"]``."""
         if wb_register_values is None:
             # just set to auto balance
             self.camera.whitebal = True
             return
-        
+
         if len(wb_register_values) != 6:
             raise RuntimeError("Please pass in 0x3400~0x3405 inclusive!")
 
         self.write_camera_register(0x3212, 0x03)
         self.write_camera_register(0x3406, 0x01)
         for i, reg_val in enumerate(wb_register_values):
-            self.write_camera_register(0x3400+i, reg_val)
+            self.write_camera_register(0x3400 + i, reg_val)
         self.write_camera_register(0x3212, 0x13)
-        self.write_camera_register(0x3212, 0xa3)
+        self.write_camera_register(0x3212, 0xA3)
 
     def set_camera_exposure(self, new_exposure=None):
+        """Set the camera's exposure values
+
+        The argument of `None` selects auto exposure.
+
+        Otherwise, the new exposure data should come from
+        ``get_camera_autosettings()["exposure"]."""
         if new_exposure is None:
             # just set auto expose
             self.camera.exposure_ctrl = True
             return
-        exposure_ctrl = False
+        self.camera.exposure_ctrl = False
 
         self.write_camera_register(0x3500, (new_exposure >> 12) & 0xFF)
         self.write_camera_register(0x3501, (new_exposure >> 4) & 0xFF)
         self.write_camera_register(0x3502, (new_exposure << 4) & 0xFF)
-        
+
     def set_camera_gain(self, new_gain=None):
+        """Set the camera's exposure values
+
+        The argument of `None` selects auto gain control.
+
+        Otherwise, the new exposure data should come from
+        ``get_camera_autosettings()["gain"]."""
         if new_gain is None:
             # just set auto expose
             self.camera.gain_ctrl = True
             return
 
         self.camera.gain_ctrl = False
-        self.write_camera_register(0x350b, new_gain)
+        self.write_camera_register(0x350B, new_gain)
+
 
 class PyCamera(PyCameraBase):
     """Wrapper class for the PyCamera hardware"""
