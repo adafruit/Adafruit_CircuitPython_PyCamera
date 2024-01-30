@@ -85,7 +85,7 @@ def ironbow(bitmap, mask=None):
 
 
 # pylint: disable=invalid-name
-def alphablend_func_factory(frac, nfrac=None):
+def alphablend_maker(frac, nfrac=None):
     """Create an alpha-blending function for a specific fractional value
 
     The resulting function can be used with ``bitmapfilter.blend`` and
