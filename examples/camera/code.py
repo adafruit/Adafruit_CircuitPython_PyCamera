@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
+# SPDX-FileCopyrightText: 2023 Limor Fried for Adafruit Industries
 #
 # SPDX-License-Identifier: Unlicense
 

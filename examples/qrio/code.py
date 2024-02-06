@@ -1,5 +1,4 @@
 # SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
-# SPDX-FileCopyrightText: Copyright (c) 2021 Jeff Epler for Adafruit Industries
 #
 # SPDX-License-Identifier: Unlicense
 
