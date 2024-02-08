@@ -48,8 +48,8 @@ _OV5640_STAT_FOCUSED = const(0x10)
 _OV5640_CMD_TRIGGER_AUTOFOCUS = const(0x03)
 _OV5640_CMD_AUTO_AUTOFOCUS = const(0x04)
 _OV5640_CMD_RELEASE_FOCUS = const(0x08)
-_OV5640_CMD_AF_SET_VCM_STEP = const(0x1a)
-_OV5640_CMD_AF_GET_VCM_STEP = const(0x1b)
+_OV5640_CMD_AF_SET_VCM_STEP = const(0x1A)
+_OV5640_CMD_AF_GET_VCM_STEP = const(0x1B)
 
 _OV5640_CMD_MAIN = const(0x3022)
 _OV5640_CMD_ACK = const(0x3023)
@@ -498,14 +498,16 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
     @property
     def autofocus_vcm_step(self):
         """Get the voice coil motor step location"""
-        if not self._send_autofocus_command(_OV5640_CMD_AF_GET_VCM_STEP, "get vcm step"):
+        if not self._send_autofocus_command(
+            _OV5640_CMD_AF_GET_VCM_STEP, "get vcm step"
+        ):
             return None
         return self.read_camera_register(_OV5640_CMD_PARA4)
 
     @autofocus_vcm_step.setter
     def autofocus_vcm_step(self, step):
         """Get the voice coil motor step location, from 0 to 255"""
-        if not (0 <= step <= 255):
+        if not 0 <= step <= 255:
             raise RuntimeError("VCM step must be 0 to 255")
         self.write_camera_register(_OV5640_CMD_PARA3, 0x00)
         self.write_camera_register(_OV5640_CMD_PARA4, step)
