@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Jeff Epler for Adafruit Industries
+# SPDX-FileCopyrightText: 2023 Limor Fried for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
 """Library for the Adafruit PyCamera with OV5640 autofocus module"""
