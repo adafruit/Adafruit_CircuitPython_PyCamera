@@ -39,6 +39,7 @@ autodoc_mock_imports = [
     "busdisplay",
     "busio",
     "digitalio",
+    "displayio"
     "espcamera",
     "fourwire",
     "micropython",
