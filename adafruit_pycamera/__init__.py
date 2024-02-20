@@ -3,7 +3,8 @@
 #
 # SPDX-License-Identifier: MIT
 """Library for the Adafruit PyCamera with OV5640 autofocus module"""
-
+# pylint: disable=too-many-lines
+import gc
 import os
 import struct
 import time
@@ -32,6 +33,11 @@ from adafruit_debouncer import Button, Debouncer
 from adafruit_display_text import label
 from digitalio import DigitalInOut, Pull
 from rainbowio import colorwheel
+from displayio import Bitmap, ColorConverter, Colorspace
+from jpegio import JpegDecoder
+import ulab.numpy as np
+from adafruit_bitmapsaver import save_pixels
+import adafruit_imageload
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
@@ -147,7 +153,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         espcamera.FrameSize.QVGA,  # 320x240
         # espcamera.FrameSize.CIF, # 400x296
         # espcamera.FrameSize.HVGA, # 480x320
-        espcamera.FrameSize.VGA,  #  640x480
+        espcamera.FrameSize.VGA,  # 640x480
         espcamera.FrameSize.SVGA,  # 800x600
         espcamera.FrameSize.XGA,  # 1024x768
         espcamera.FrameSize.HD,  # 1280x720
@@ -230,6 +236,12 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.display = None
         self.pixels = None
         self.sdcard = None
+        self._last_saved_image_filename = None
+        self.decoder = None
+        self._overlay = None
+        self.overlay_transparency_color = None
+        self.overlay_bmp = None
+        self.combined_bmp = None
         self.splash = displayio.Group()
 
         # Reset display and I/O expander
@@ -797,6 +809,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
                 os.stat(filename)
             except OSError:
                 break
+        self._last_saved_image_filename = filename
         print("Writing to", filename)
         return open(filename, "wb")
 
@@ -826,6 +839,78 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             print("# Wrote image")
         else:
             print("# frame capture failed")
+
+    @property
+    def overlay(self) -> str:
+        """
+        The overlay file to be used. A filepath string that points
+        to a .bmp file that has 24bit RGB888 Colorspace.
+        The overlay image will be shown in the camera preview,
+        and combined to create a modified version of the
+        final photo.
+        """
+        return self._overlay
+
+    @overlay.setter
+    def overlay(self, new_overlay_file: str) -> None:
+        if self.overlay_bmp is not None:
+            self.overlay_bmp.deinit()
+        self._overlay = new_overlay_file
+        cc888 = ColorConverter(input_colorspace=Colorspace.RGB888)
+        self.overlay_bmp, _ = adafruit_imageload.load(new_overlay_file, palette=cc888)
+
+        arr = np.frombuffer(self.overlay_bmp, dtype=np.uint16)
+        arr.byteswap(inplace=True)
+
+        del arr
+
+    def _init_jpeg_decoder(self):
+        """
+        Initialize the JpegDecoder if it hasn't been already.
+        Only needed if overlay is used.
+        """
+        if self.decoder is None:
+            self.decoder = JpegDecoder()
+
+    def blit_overlay_into_last_capture(self):
+        """
+        Create a modified version of the last photo taken that pastes
+        the overlay image on top of the photo and saves the new version
+        in a separate but similarly named .bmp file on the SDCard.
+        """
+        if self.overlay_bmp is None:
+            raise ValueError(
+                "Must set overlay before calling blit_overlay_into_last_capture"
+            )
+
+        self._init_jpeg_decoder()
+
+        width, height = self.decoder.open(self._last_saved_image_filename)
+        photo_bitmap = Bitmap(width, height, 65535)
+
+        self.decoder.decode(photo_bitmap, scale=0, x=0, y=0)
+
+        bitmaptools.blit(
+            photo_bitmap,
+            self.overlay_bmp,
+            0,
+            0,
+            skip_source_index=self.overlay_transparency_color,
+            skip_dest_index=None,
+        )
+
+        cc565_swapped = ColorConverter(input_colorspace=Colorspace.RGB565_SWAPPED)
+        save_pixels(
+            self._last_saved_image_filename.replace(".jpg", "_modified.bmp"),
+            photo_bitmap,
+            cc565_swapped,
+        )
+
+        # RAM cleanup
+        photo_bitmap.deinit()
+        del photo_bitmap
+        del cc565_swapped
+        gc.collect()
 
     def continuous_capture_start(self):
         """Switch the camera to continuous-capture mode"""
@@ -871,6 +956,20 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         The default preview capture is 240x176, leaving 32 pixel rows at the top and bottom
         for status information.
         """
+
+        if self.overlay_bmp is not None:
+            if self.combined_bmp is None:
+                self.combined_bmp = Bitmap(bitmap.width, bitmap.height, 65535)
+
+            bitmaptools.blit(self.combined_bmp, bitmap, 0, 0)
+
+            bitmaptools.rotozoom(
+                self.combined_bmp,
+                self.overlay_bmp,
+                scale=0.75,
+                skip_index=self.overlay_transparency_color,
+            )
+            bitmap = self.combined_bmp
 
         self._display_bus.send(
             42, struct.pack(">hh", 80 + x_offset, 80 + x_offset + bitmap.width - 1)

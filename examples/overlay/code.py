@@ -1,28 +1,32 @@
 # SPDX-FileCopyrightText: Copyright (c) 2023 john park for Adafruit Industries
+# SPDX-FileCopyrightText: Copyright (c) 202 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example. No bells! Zero whistles! """
+""" simple point-and-shoot camera example, with an overlay frame image. """
 
 import time
+import traceback
 import adafruit_pycamera  # pylint: disable=import-error
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example
 
 # User settings - try changing these:
-pycam.resolution = 8  # 0-12 preset resolutions:
-#                      0: 240x240, 1: 320x240, 2: 640x480, 3: 800x600, 4: 1024x768,
-#                      5: 1280x720, 6: 1280x1024, 7: 1600x1200, 8: 1920x1080, 9: 2048x1536,
-#                      10: 2560x1440, 11: 2560x1600, 12: 2560x1920
+pycam.resolution = 1  # 0-12 preset resolutions:
+#                      0: 240x240, 1: 320x240, 2: 640x480
+
 pycam.led_level = 1  # 0-4 preset brightness levels
 pycam.led_color = 0  # 0-7  preset colors: 0: white, 1: green, 2: yellow, 3: red,
 #                                          4: pink, 5: blue, 6: teal, 7: rainbow
 pycam.effect = 0  # 0-7 preset FX: 0: normal, 1: invert, 2: b&w, 3: red,
 #                                  4: green, 5: blue, 6: sepia, 7: solarize
 
-print("Simple camera ready.")
+print("Overlay example camera ready.")
 pycam.tone(800, 0.1)
 pycam.tone(1200, 0.05)
+
+pycam.overlay = "/heart_frame_rgb888.bmp"
+pycam.overlay_transparency_color = 0xE007
 
 while True:
     pycam.blit(pycam.continuous_capture())
@@ -35,8 +39,11 @@ while True:
         try:
             pycam.display_message("snap", color=0x00DD00)
             pycam.capture_jpeg()
+            pycam.display_message("overlay", color=0x00DD00)
+            pycam.blit_overlay_into_last_capture()
             pycam.live_preview_mode()
         except TypeError as exception:
+            traceback.print_exception(exception)
             pycam.display_message("Failed", color=0xFF0000)
             time.sleep(0.5)
             pycam.live_preview_mode()
