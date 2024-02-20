@@ -33,11 +33,6 @@ from adafruit_debouncer import Button, Debouncer
 from adafruit_display_text import label
 from digitalio import DigitalInOut, Pull
 from rainbowio import colorwheel
-from displayio import Bitmap, ColorConverter, Colorspace
-from jpegio import JpegDecoder
-import ulab.numpy as np
-from adafruit_bitmapsaver import save_pixels
-import adafruit_imageload
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PyCamera.git"
@@ -853,6 +848,11 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
 
     @overlay.setter
     def overlay(self, new_overlay_file: str) -> None:
+        # pylint: disable=import-outside-toplevel
+        from displayio import ColorConverter, Colorspace
+        import ulab.numpy as np
+        import adafruit_imageload
+
         if self.overlay_bmp is not None:
             self.overlay_bmp.deinit()
         self._overlay = new_overlay_file
@@ -865,6 +865,9 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         del arr
 
     def _init_jpeg_decoder(self):
+        # pylint: disable=import-outside-toplevel
+        from jpegio import JpegDecoder
+
         """
         Initialize the JpegDecoder if it hasn't been already.
         Only needed if overlay is used.
@@ -882,6 +885,9 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             raise ValueError(
                 "Must set overlay before calling blit_overlay_into_last_capture"
             )
+        # pylint: disable=import-outside-toplevel
+        from adafruit_bitmapsaver import save_pixels
+        from displayio import Bitmap, ColorConverter, Colorspace
 
         self._init_jpeg_decoder()
 
@@ -956,6 +962,8 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         The default preview capture is 240x176, leaving 32 pixel rows at the top and bottom
         for status information.
         """
+        # pylint: disable=import-outside-toplevel
+        from displayio import Bitmap
 
         if self.overlay_bmp is not None:
             if self.combined_bmp is None:
