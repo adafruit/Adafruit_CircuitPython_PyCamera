@@ -1,12 +1,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2023 john park for Adafruit Industries
-# SPDX-FileCopyrightText: Copyright (c) 202 Tim Cocks for Adafruit Industries
+# SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with an overlay frame image. """
+""" simple point-and-shoot camera example, with overly selecting using select button.
 
+Place all overlay files inside /sd/overlays/ directory.
+"""
+import os
 import time
 import traceback
 import adafruit_pycamera  # pylint: disable=import-error
+
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example
@@ -25,12 +29,25 @@ print("Overlay example camera ready.")
 pycam.tone(800, 0.1)
 pycam.tone(1200, 0.05)
 
-pycam.overlay = "/heart_frame_rgb888.bmp"
+overlay_files = os.listdir("/sd/overlays/")
+cur_overlay_idx = 0
+
+pycam.overlay = f"/sd/overlays/{overlay_files[cur_overlay_idx]}"
 pycam.overlay_transparency_color = 0xE007
+
+overlay_files = os.listdir("/sd/overlays/")
+cur_overlay_idx = 0
 
 while True:
     pycam.blit(pycam.continuous_capture())
     pycam.keys_debounce()
+    # print(dir(pycam.select))
+    if pycam.select.fell:
+        cur_overlay_idx += 1
+        if cur_overlay_idx >= len(overlay_files):
+            cur_overlay_idx = 0
+        print(f"changing overlay to {overlay_files[cur_overlay_idx]}")
+        pycam.overlay = f"/sd/overlays/{overlay_files[cur_overlay_idx]}"
 
     if pycam.shutter.short_count:
         print("Shutter released")
