@@ -1,16 +1,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2023 john park for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-''' simple point-and-shoot camera example. No bells! Zero whistles! '''
+""" simple point-and-shoot camera example. No bells! Zero whistles! """
 
 import time
-import adafruit_pycamera # pylint: disable=import-error
+import adafruit_pycamera  # pylint: disable=import-error
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example
 
 # User settings - try changing these:
-pycam.resolution = 8    # 0-12 preset resolutions:
+pycam.resolution = 8  # 0-12 preset resolutions:
 #                      0: 240x240, 1: 320x240, 2: 640x480, 3: 800x600, 4: 1024x768,
 #                      5: 1280x720, 6: 1280x1024, 7: 1600x1200, 8: 1920x1080, 9: 2048x1536,
 #                      10: 2560x1440, 11: 2560x1600, 12: 2560x1920
