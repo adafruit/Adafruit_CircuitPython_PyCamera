@@ -22,7 +22,14 @@ pycam.camera.reconfigure(
 pycam.camera.quality = 6
 
 server = Server(socketpool.SocketPool(wifi.radio))
-PORT = 81
+if wifi.radio.ipv4_address:
+    # use alt port if web workflow enabled
+    port = 8080
+else:
+    # connect to wifi and use standard http port otherwise
+    wifi.radio.connect(os.getenv("WIFI_SSID"), os.getenv("WIFI_PASSWORD"))
+    port = 80
+
 BOUNDARY = b"FRAME" + binascii.hexlify(os.urandom(8))
 
 
@@ -51,7 +58,7 @@ def base(request):
 
 
 async def poll(interval):
-    server.start(str(wifi.radio.ipv4_address), port=PORT)
+    server.start(str(wifi.radio.ipv4_address), port=port)
     while True:
         try:
             server.poll()
@@ -65,6 +72,6 @@ async def main():
     await asyncio.gather(poll_task)
 
 
-pycam.display_message(f"{wifi.radio.ipv4_address}:{PORT}/", scale=2)
+pycam.display_message(f"{wifi.radio.ipv4_address}:{port}/", scale=2)
 
 asyncio.run(main())

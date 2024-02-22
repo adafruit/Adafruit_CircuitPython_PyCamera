@@ -119,4 +119,5 @@ def property_common(obj, request):
         return JSONResponse(request, {"error": str(exc)}, status=BAD_REQUEST_400)
 
 
+pycam.display_message(f"{wifi.radio.ipv4_address}:{port}/", scale=2)
 server.serve_forever(str(wifi.radio.ipv4_address), port)
