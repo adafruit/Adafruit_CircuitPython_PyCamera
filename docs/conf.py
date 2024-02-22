@@ -41,6 +41,7 @@ autodoc_mock_imports = [
     "digitalio",
     "espcamera",
     "fourwire",
+    "jpegio",
     "micropython",
     "neopixel",
     "sdcardio",
