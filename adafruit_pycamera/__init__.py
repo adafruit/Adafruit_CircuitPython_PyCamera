@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 """Library for the Adafruit PyCamera with OV5640 autofocus module"""
+
 # pylint: disable=too-many-lines
 import gc
 import os
@@ -282,6 +283,32 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._card_power = make_expander_output(_AW_SDPWR, True)
 
         self.mute = make_expander_output(_AW_MUTE, False)
+
+        self.check_for_update_needed()
+
+    def check_for_update_needed(self):
+        """Check whether CIRCUITPY is too big, indicating it was created
+        by a version of CircuitPython older than 9.0.0 beta 2.
+        If so display and print a message and hang.
+        """
+        circuitpy_stat = os.statvfs("/")
+        # CIRCUITPY should be 960KB or so. >1MB is too large
+        # and indicates an older version of CircuitPython
+        # created the filesystem.
+        if circuitpy_stat[1] * circuitpy_stat[2] > 1000000:
+            message = """\
+CIRCUITPY problem.
+Backup. Update CPy
+to >= 9.0.0-beta.2.
+Reformat:
+ import storage
+ storage.erase_
+filesystem()
+See Learn Guide."""
+            self.display_message(message, color=0xFFFFFF, scale=2, full_screen=True)
+            print(message)
+            while True:
+                pass
 
     def make_camera_ui(self):
         """Create displayio widgets for the standard camera UI"""
@@ -685,13 +712,15 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self._display_bus = None
         self.display = None
 
-    def display_message(self, message, color=0xFF0000, scale=3):
+    def display_message(self, message, color=0xFF0000, scale=3, full_screen=False):
         """Display a message on the TFT"""
         text_area = label.Label(terminalio.FONT, text=message, color=color, scale=scale)
-        text_area.anchor_point = (0.5, 0.5)
+        text_area.anchor_point = (0, 0) if full_screen else (0.5, 0.5)
         if not self.display:
             self.init_display()
-        text_area.anchored_position = (self.display.width / 2, self.display.height / 2)
+        text_area.anchored_position = (
+            (0, 0) if full_screen else (self.display.width / 2, self.display.height / 2)
+        )
 
         # Show it
         self.splash.append(text_area)
@@ -1101,6 +1130,7 @@ class PyCamera(PyCameraBase):
         self.init_neopixel()
         self.init_display()
         self.init_camera(init_autofocus)
+
         try:
             self.mount_sd_card()
         except Exception as exc:  # pylint: disable=broad-exception-caught
