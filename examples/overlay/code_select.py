@@ -11,7 +11,6 @@ import time
 import traceback
 import adafruit_pycamera  # pylint: disable=import-error
 
-
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example
 
@@ -34,6 +33,7 @@ cur_overlay_idx = 0
 
 pycam.overlay = f"/sd/overlays/{overlay_files[cur_overlay_idx]}"
 pycam.overlay_transparency_color = 0xE007
+pycam.overlay_position = [0, 0]
 
 overlay_files = os.listdir("/sd/overlays/")
 cur_overlay_idx = 0
@@ -48,6 +48,16 @@ while True:
             cur_overlay_idx = 0
         print(f"changing overlay to {overlay_files[cur_overlay_idx]}")
         pycam.overlay = f"/sd/overlays/{overlay_files[cur_overlay_idx]}"
+
+    if not pycam.down.value:
+        pycam.overlay_position[1] += 1 * (int(pycam.down.current_duration / 0.3) + 1)
+    if not pycam.up.value:
+        pycam.overlay_position[1] -= 1 * (int(pycam.up.current_duration / 0.3) + 1)
+
+    if not pycam.left.value:
+        pycam.overlay_position[0] -= 1 * (int(pycam.left.current_duration / 0.3) + 1)
+    if not pycam.right.value:
+        pycam.overlay_position[0] += 1 * (int(pycam.right.current_duration / 0.3) + 1)
 
     if pycam.shutter.short_count:
         print("Shutter released")
