@@ -820,14 +820,17 @@ See Learn Guide."""
         # self.effect = self._effect
         self.continuous_capture_start()
 
-    def open_next_image(self, extension="jpg"):
+    def open_next_image(self, extension="jpg", filename_prefix="img"):
         """Return an opened numbered file on the sdcard, such as "img01234.jpg"."""
         try:
             os.stat("/sd")
         except OSError as exc:  # no SD card!
             raise RuntimeError("No SD card mounted") from exc
         while True:
-            filename = "/sd/img%04d.%s" % (self._image_counter, extension)
+            filename = f"/sd/{filename_prefix}%04d.%s" % (
+                self._image_counter,
+                extension,
+            )
             self._image_counter += 1
             try:
                 os.stat(filename)
@@ -837,7 +840,7 @@ See Learn Guide."""
         print("Writing to", filename)
         return open(filename, "wb")
 
-    def capture_jpeg(self):
+    def capture_jpeg(self, filename_prefix="img"):
         """Capture a jpeg file and save it to the SD card"""
         try:
             os.stat("/sd")
@@ -855,7 +858,7 @@ See Learn Guide."""
             print(f"Captured {len(jpeg)} bytes of jpeg data")
             print("Resolution %d x %d" % (self.camera.width, self.camera.height))
 
-            with self.open_next_image() as dest:
+            with self.open_next_image(filename_prefix=filename_prefix) as dest:
                 chunksize = 16384
                 for offset in range(0, len(jpeg), chunksize):
                     dest.write(jpeg[offset : offset + chunksize])
