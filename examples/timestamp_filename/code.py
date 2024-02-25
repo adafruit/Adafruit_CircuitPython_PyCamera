@@ -2,7 +2,10 @@
 #
 # SPDX-License-Identifier: MIT
 """ simple point-and-shoot camera example. With NTP and internal RTC to
- add timestamp to photo filenames. Must install adafruit_ntp library!"""
+ add timestamp to photo filenames. Must install adafruit_ntp library!
+ Example code assumes WIFI credentials are properly setup and web workflow
+ enabled in settings.toml. If not, you'll need to add code to manually connect
+ to your network."""
 
 import time
 import wifi
