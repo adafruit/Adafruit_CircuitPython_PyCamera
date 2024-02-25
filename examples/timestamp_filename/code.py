@@ -5,12 +5,11 @@
  add timestamp to photo filenames. Must install adafruit_ntp library!"""
 
 import time
-import adafruit_pycamera  # pylint: disable=import-error
 import wifi
 import socketpool
-import adafruit_ntp
 import rtc
-import time
+import adafruit_ntp
+import adafruit_pycamera  # pylint: disable=import-error
 
 pool = socketpool.SocketPool(wifi.radio)
 ntp = adafruit_ntp.NTP(pool, tz_offset=0)
@@ -44,7 +43,11 @@ while True:
         pycam.tone(1600, 0.05)
         try:
             pycam.display_message("snap", color=0x00DD00)
-            timestamp = f"img_{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}_{time.localtime().tm_hour:02}-{time.localtime().tm_min:02}-{time.localtime().tm_sec:02}_"
+            # pylint: disable=line-too-long
+            timestamp = (
+                f"img_{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}"
+                f"_{time.localtime().tm_hour:02}-{time.localtime().tm_min:02}-{time.localtime().tm_sec:02}_"
+            )
             pycam.capture_jpeg(filename_prefix=timestamp)
             pycam.live_preview_mode()
         except TypeError as exception:
