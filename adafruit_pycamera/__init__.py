@@ -238,6 +238,8 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.overlay_transparency_color = None
         self.overlay_bmp = None
         self.combined_bmp = None
+        self.preview_scale = None
+        self.overlay_position = [None, None]
         self.splash = displayio.Group()
 
         # Reset display and I/O expander
@@ -645,6 +647,8 @@ See Learn Guide."""
             microcontroller.nvm[_NVM_RESOLUTION] = res
             self._resolution = res
             self._res_label.text = self.resolutions[res]
+            _width = int(self.resolutions[self.resolution].split("x")[0])
+            self.preview_scale = 240 / _width
         self.display.refresh()
 
     @property
@@ -928,8 +932,8 @@ See Learn Guide."""
         bitmaptools.blit(
             photo_bitmap,
             self.overlay_bmp,
-            0,
-            0,
+            self.overlay_position[0] if self.overlay_position[0] is not None else 0,
+            self.overlay_position[1] if self.overlay_position[1] is not None else 0,
             skip_source_index=self.overlay_transparency_color,
             skip_dest_index=None,
         )
@@ -1003,8 +1007,16 @@ See Learn Guide."""
             bitmaptools.rotozoom(
                 self.combined_bmp,
                 self.overlay_bmp,
-                scale=0.75,
+                scale=self.preview_scale,
                 skip_index=self.overlay_transparency_color,
+                ox=int(self.overlay_position[0] * self.preview_scale)
+                if self.overlay_position[0] is not None
+                else None,
+                oy=int(self.overlay_position[1] * self.preview_scale)
+                if self.overlay_position[1] is not None
+                else None,
+                px=0 if self.overlay_position[0] is not None else None,
+                py=0 if self.overlay_position[1] is not None else None,
             )
             bitmap = self.combined_bmp
 
