@@ -240,6 +240,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.combined_bmp = None
         self.preview_scale = None
         self.overlay_position = [None, None]
+        self.overlay_scale = 1.0
         self.splash = displayio.Group()
 
         # Reset display and I/O expander
@@ -929,13 +930,15 @@ See Learn Guide."""
 
         self.decoder.decode(photo_bitmap, scale=0, x=0, y=0)
 
-        bitmaptools.blit(
+        bitmaptools.rotozoom(
             photo_bitmap,
             self.overlay_bmp,
-            self.overlay_position[0] if self.overlay_position[0] is not None else 0,
-            self.overlay_position[1] if self.overlay_position[1] is not None else 0,
-            skip_source_index=self.overlay_transparency_color,
-            skip_dest_index=None,
+            ox=self.overlay_position[0] if self.overlay_position[0] is not None else 0,
+            oy=self.overlay_position[1] if self.overlay_position[1] is not None else 0,
+            px=0 if self.overlay_position[0] is not None else None,
+            py=0 if self.overlay_position[1] is not None else None,
+            skip_index=self.overlay_transparency_color,
+            scale=self.overlay_scale,
         )
 
         cc565_swapped = ColorConverter(input_colorspace=Colorspace.RGB565_SWAPPED)
@@ -1007,7 +1010,7 @@ See Learn Guide."""
             bitmaptools.rotozoom(
                 self.combined_bmp,
                 self.overlay_bmp,
-                scale=self.preview_scale,
+                scale=self.preview_scale * self.overlay_scale,
                 skip_index=self.overlay_transparency_color,
                 ox=int(self.overlay_position[0] * self.preview_scale)
                 if self.overlay_position[0] is not None
