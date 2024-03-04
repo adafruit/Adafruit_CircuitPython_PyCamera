@@ -47,7 +47,14 @@ while True:
         try:
             pycam.display_message("snap", color=0x00DD00)
             # pylint: disable=line-too-long
-            timestamp = f"img_{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}_{time.localtime().tm_hour:02}-{time.localtime().tm_min:02}-{time.localtime().tm_sec:02}_"
+            timestamp = "img_{}-{}-{}_{:02}-{:02}-{:02}_".format(
+                time.localtime().tm_year,
+                time.localtime().tm_mon,
+                time.localtime().tm_mday,
+                time.localtime().tm_hour,
+                time.localtime().tm_min,
+                time.localtime().tm_sec,
+            )
             pycam.capture_jpeg(filename_prefix=timestamp)
             pycam.live_preview_mode()
         except TypeError as exception:
