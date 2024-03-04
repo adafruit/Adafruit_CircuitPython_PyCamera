@@ -827,10 +827,7 @@ See Learn Guide."""
         except OSError as exc:  # no SD card!
             raise RuntimeError("No SD card mounted") from exc
         while True:
-            filename = f"/sd/{filename_prefix}%04d.%s" % (
-                self._image_counter,
-                extension,
-            )
+            filename = f"/sd/{filename_prefix}{self._image_counter}.{extension}"
             self._image_counter += 1
             try:
                 os.stat(filename)
