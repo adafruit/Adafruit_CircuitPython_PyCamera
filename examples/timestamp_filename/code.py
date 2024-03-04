@@ -46,7 +46,6 @@ while True:
         pycam.tone(1600, 0.05)
         try:
             pycam.display_message("snap", color=0x00DD00)
-            # pylint: disable=line-too-long
             timestamp = "img_{}-{}-{}_{:02}-{:02}-{:02}_".format(
                 time.localtime().tm_year,
                 time.localtime().tm_mon,
