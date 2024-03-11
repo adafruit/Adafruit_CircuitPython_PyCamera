@@ -11,6 +11,12 @@ import time
 import traceback
 import adafruit_pycamera  # pylint: disable=import-error
 
+MODE_POSITION = 0
+MODE_SCALE = 1
+CURRENT_MODE = 0
+
+int_scale = 100
+
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example
 
@@ -49,16 +55,34 @@ while True:
         print(f"changing overlay to {overlay_files[cur_overlay_idx]}")
         pycam.overlay = f"/sd/overlays/{overlay_files[cur_overlay_idx]}"
 
-    if not pycam.down.value:
-        pycam.overlay_position[1] += 1 * (int(pycam.down.current_duration / 0.3) + 1)
-    if not pycam.up.value:
-        pycam.overlay_position[1] -= 1 * (int(pycam.up.current_duration / 0.3) + 1)
+    if CURRENT_MODE == MODE_POSITION:
+        if not pycam.down.value:
+            pycam.overlay_position[1] += 1 * (
+                int(pycam.down.current_duration / 0.3) + 1
+            )
+        if not pycam.up.value:
+            pycam.overlay_position[1] -= 1 * (int(pycam.up.current_duration / 0.3) + 1)
+        if not pycam.left.value:
+            pycam.overlay_position[0] -= 1 * (
+                int(pycam.left.current_duration / 0.3) + 1
+            )
+        if not pycam.right.value:
+            pycam.overlay_position[0] += 1 * (
+                int(pycam.right.current_duration / 0.3) + 1
+            )
+    if CURRENT_MODE == MODE_SCALE:
+        if pycam.down.fell:
+            int_scale -= 10
+            pycam.overlay_scale = int_scale / 100
+            print(pycam.overlay_scale)
+        if pycam.up.fell:
+            int_scale += 10
+            pycam.overlay_scale = int_scale / 100
+            print(pycam.overlay_scale)
 
-    if not pycam.left.value:
-        pycam.overlay_position[0] -= 1 * (int(pycam.left.current_duration / 0.3) + 1)
-    if not pycam.right.value:
-        pycam.overlay_position[0] += 1 * (int(pycam.right.current_duration / 0.3) + 1)
-
+    if pycam.ok.fell:
+        CURRENT_MODE = MODE_POSITION if CURRENT_MODE == MODE_SCALE else MODE_SCALE
+        print(f"Changing mode to: {CURRENT_MODE}")
     if pycam.shutter.short_count:
         print("Shutter released")
         pycam.tone(1200, 0.05)
