@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: 2023 Limor Fried for Adafruit Industries
 #
 # SPDX-License-Identifier: Unlicense
-
 import ssl
 import os
 import time
@@ -18,19 +17,21 @@ import ulab.numpy as np
 
 import adafruit_pycamera
 
-UTC_OFFSET = os.getenv('UTC_OFFSET')
-TZ = os.getenv('TZ')
-
 # Wifi details are in settings.toml file, also,
-# timezone info should be included to allow local time and DST adjustments
+# timezone info should be included in settings.toml to allow local time and DST adjustments
 # # UTC_OFFSET, if present, will override TZ and DST and no API query will be done
 # UTC_OFFSET=-25200
 # # TZ="America/Phoenix"
 
+UTC_OFFSET = os.getenv("UTC_OFFSET")
+TZ = os.getenv("TZ")
+
 try:
-    print("Connecting to %s"%os.getenv("CIRCUITPY_WIFI_SSID"))
-    wifi.radio.connect(os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD"))
-    print("Connected to %s!"%os.getenv("CIRCUITPY_WIFI_SSID"))
+    print(f"Connecting to {os.getenv('CIRCUITPY_WIFI_SSID')}")
+    wifi.radio.connect(
+        os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
+    )
+    print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}!")
     print("My IP address is", wifi.radio.ipv4_address)
     pool = socketpool.SocketPool(wifi.radio)
 
