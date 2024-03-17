@@ -3,21 +3,21 @@
 #
 # SPDX-License-Identifier: Unlicense
 
-import ipaddress
+import adafruit_pycamera
+
 import ssl
-import wifi
 import socketpool
 import adafruit_requests
 import os
 import rtc
 import adafruit_ntp
-from adafruit_datetime import datetime
-
 import time
+import wifi
 import bitmaptools
 import displayio
 import gifio
 import ulab.numpy as np
+
 UTC_OFFSET = os.getenv('UTC_OFFSET')
 TZ = os.getenv('TZ')
 
