@@ -3,11 +3,49 @@
 #
 # SPDX-License-Identifier: Unlicense
 
+import ipaddress
+import ssl
+import wifi
+import socketpool
+import adafruit_requests
+import os
+import rtc
+import adafruit_ntp
+from adafruit_datetime import datetime
+
 import time
 import bitmaptools
 import displayio
 import gifio
 import ulab.numpy as np
+UTC_OFFSET = os.getenv('UTC_OFFSET')
+TZ = os.getenv('TZ')
+
+# Wifi details are in settings.toml file, also,
+# timezone info should be included to allow local time and DST adjustments
+# # UTC_OFFSET, if present, will override TZ and DST and no API query will be done
+# UTC_OFFSET=-25200
+# # TZ="America/Phoenix"
+
+try:
+    print("Connecting to %s"%os.getenv("CIRCUITPY_WIFI_SSID"))
+    wifi.radio.connect(os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD"))
+    print("Connected to %s!"%os.getenv("CIRCUITPY_WIFI_SSID"))
+    print("My IP address is", wifi.radio.ipv4_address)
+    pool = socketpool.SocketPool(wifi.radio)
+
+    if UTC_OFFSET is None:
+        requests = adafruit_requests.Session(pool, ssl.create_default_context())
+        response = requests.get("http://worldtimeapi.org/api/timezone/" + TZ)
+        response_as_json = response.json()
+        UTC_OFFSET = response_as_json["raw_offset"] + response_as_json["dst_offset"]
+
+    ntp = adafruit_ntp.NTP(pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600)
+
+    rtc.RTC().datetime = ntp.datetime
+except Exception as e:
+    print("Wifi error:", e)
+    print("Time not set")
 
 import adafruit_pycamera
 
