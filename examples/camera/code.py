@@ -47,8 +47,6 @@ except Exception as e:
     print("Wifi error:", e)
     print("Time not set")
 
-import adafruit_pycamera
-
 pycam = adafruit_pycamera.PyCamera()
 # pycam.live_preview_mode()
 
