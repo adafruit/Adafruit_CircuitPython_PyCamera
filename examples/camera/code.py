@@ -18,8 +18,7 @@ import ulab.numpy as np
 import adafruit_pycamera
 
 # Wifi details are in settings.toml file, also,
-# timezone info should be included in settings.toml to allow local time and DST adjustments
-
+# timezone info should be included to allow local time and DST adjustments
 # # UTC_OFFSET, if present, will override TZ and DST and no API query will be done
 # UTC_OFFSET=-25200
 # # TZ="America/Phoenix"
