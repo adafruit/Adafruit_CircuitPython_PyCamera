@@ -2,35 +2,37 @@
 # SPDX-FileCopyrightText: 2023 Limor Fried for Adafruit Industries
 #
 # SPDX-License-Identifier: Unlicense
-
-import ipaddress
 import ssl
-import wifi
+import os
+import time
 import socketpool
 import adafruit_requests
-import os
 import rtc
 import adafruit_ntp
-from adafruit_datetime import datetime
-
-import time
+import wifi
 import bitmaptools
 import displayio
 import gifio
 import ulab.numpy as np
-UTC_OFFSET = os.getenv('UTC_OFFSET')
-TZ = os.getenv('TZ')
+
+import adafruit_pycamera
 
 # Wifi details are in settings.toml file, also,
-# timezone info should be included to allow local time and DST adjustments
+# timezone info should be included in settings.toml to allow local time and DST adjustments
+
 # # UTC_OFFSET, if present, will override TZ and DST and no API query will be done
 # UTC_OFFSET=-25200
 # # TZ="America/Phoenix"
 
-try:
-    print("Connecting to %s"%os.getenv("CIRCUITPY_WIFI_SSID"))
-    wifi.radio.connect(os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD"))
-    print("Connected to %s!"%os.getenv("CIRCUITPY_WIFI_SSID"))
+UTC_OFFSET = os.getenv("UTC_OFFSET")
+TZ = os.getenv("TZ")
+
+print(f"Connecting to {os.getenv('CIRCUITPY_WIFI_SSID')}")
+wifi.radio.connect(
+    os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
+    )
+if wifi.radio.connected:
+    print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}!")
     print("My IP address is", wifi.radio.ipv4_address)
     pool = socketpool.SocketPool(wifi.radio)
 
@@ -43,11 +45,8 @@ try:
     ntp = adafruit_ntp.NTP(pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600)
 
     rtc.RTC().datetime = ntp.datetime
-except Exception as e:
-    print("Wifi error:", e)
-    print("Time not set")
-
-import adafruit_pycamera
+else:
+    print("Wifi failed to connect. Time not set.")
 
 pycam = adafruit_pycamera.PyCamera()
 # pycam.live_preview_mode()
