@@ -26,11 +26,11 @@ import adafruit_pycamera
 UTC_OFFSET = os.getenv("UTC_OFFSET")
 TZ = os.getenv("TZ")
 
-try:
-    print(f"Connecting to {os.getenv('CIRCUITPY_WIFI_SSID')}")
-    wifi.radio.connect(
-        os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
+print(f"Connecting to {os.getenv('CIRCUITPY_WIFI_SSID')}")
+wifi.radio.connect(
+    os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
     )
+if wifi.radio.connected:
     print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}!")
     print("My IP address is", wifi.radio.ipv4_address)
     pool = socketpool.SocketPool(wifi.radio)
@@ -44,9 +44,8 @@ try:
     ntp = adafruit_ntp.NTP(pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600)
 
     rtc.RTC().datetime = ntp.datetime
-except Exception as e:
-    print("Wifi error:", e)
-    print("Time not set")
+else:
+    print("Wifi failed to connect. Time not set.")
 
 pycam = adafruit_pycamera.PyCamera()
 # pycam.live_preview_mode()
