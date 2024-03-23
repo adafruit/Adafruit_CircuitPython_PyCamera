@@ -41,6 +41,12 @@ classifiers = [
 ]
 dynamic = ["dependencies", "optional-dependencies"]
 
+[tool.ruff]
+target-version = "py38"
+
+[tool.ruff.format]
+line-ending = "lf"
+
 [tool.setuptools]
 # TODO: IF LIBRARY FILES ARE A PACKAGE FOLDER,
 #       CHANGE `py_modules = ['...']` TO `packages = ['...']`

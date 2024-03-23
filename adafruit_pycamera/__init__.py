@@ -200,10 +200,10 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
     _INIT_SEQUENCE = (
         b"\x01\x80\x78"  # _SWRESET and Delay 120ms
         b"\x11\x80\x05"  # _SLPOUT and Delay 5ms
-        b"\x3A\x01\x55"  # _COLMOD
+        b"\x3a\x01\x55"  # _COLMOD
         b"\x21\x00"  # _INVON Hack
         b"\x13\x00"  # _NORON
-        b"\x36\x01\xA0"  # _MADCTL
+        b"\x36\x01\xa0"  # _MADCTL
         b"\x29\x80\x05"  # _DISPON and Delay 5ms
     )
 

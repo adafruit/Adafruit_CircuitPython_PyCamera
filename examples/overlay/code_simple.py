@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with an overlay frame image. """
+"""simple point-and-shoot camera example, with an overlay frame image."""
 
 import time
 import traceback

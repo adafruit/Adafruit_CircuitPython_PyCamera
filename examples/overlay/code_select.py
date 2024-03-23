@@ -2,10 +2,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with overly selecting using select button.
+"""simple point-and-shoot camera example, with overly selecting using select button.
 
 Place all overlay files inside /sd/overlays/ directory.
 """
+
 import os
 import time
 import traceback
