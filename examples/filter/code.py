@@ -137,8 +137,7 @@ effects = [
 
 def cycle(seq):
     while True:
-        for s in seq:
-            yield s
+        yield from seq
 
 
 effects_cycle = iter(cycle(effects))
