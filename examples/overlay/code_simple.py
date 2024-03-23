@@ -6,6 +6,7 @@
 
 import time
 import traceback
+
 import adafruit_pycamera  # pylint: disable=import-error
 
 pycam = adafruit_pycamera.PyCamera()

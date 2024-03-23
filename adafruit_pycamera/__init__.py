@@ -19,10 +19,10 @@ import adafruit_aw9523
 import adafruit_lis3dh
 import bitmaptools
 import board
-import displayio
-import fourwire
 import busdisplay
+import displayio
 import espcamera
+import fourwire
 import microcontroller
 import neopixel
 import pwmio
@@ -883,9 +883,9 @@ See Learn Guide."""
     @overlay.setter
     def overlay(self, new_overlay_file: str) -> None:
         # pylint: disable=import-outside-toplevel
-        from displayio import ColorConverter, Colorspace
-        import ulab.numpy as np
         import adafruit_imageload
+        import ulab.numpy as np
+        from displayio import ColorConverter, Colorspace
 
         if self.overlay_bmp is not None:
             self.overlay_bmp.deinit()

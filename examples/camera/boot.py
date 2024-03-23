@@ -6,6 +6,7 @@
 """Automatically create the /sd mount point at boot time"""
 
 import os
+
 import storage
 
 storage.remount("/", readonly=False)

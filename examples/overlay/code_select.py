@@ -10,6 +10,7 @@ Place all overlay files inside /sd/overlays/ directory.
 import os
 import time
 import traceback
+
 import adafruit_pycamera  # pylint: disable=import-error
 
 MODE_POSITION = 0

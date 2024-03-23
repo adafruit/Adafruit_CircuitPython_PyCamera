@@ -11,16 +11,14 @@ Press any of the directional buttons to immediately apply a new effect.
 Otherwise, effects cycle every DISPLAY_INTERVAL milliseconds (default 2000 = 2 seconds)
 """
 
-import displayio
-from jpegio import JpegDecoder
-from adafruit_display_text.label import Label
-from adafruit_ticks import ticks_less, ticks_ms, ticks_add, ticks_diff
-from font_free_mono_bold_24 import FONT
 import bitmapfilter
+import displayio
+from adafruit_display_text.label import Label
+from adafruit_ticks import ticks_add, ticks_diff, ticks_less, ticks_ms
+from font_free_mono_bold_24 import FONT
+from jpegio import JpegDecoder
 
-from adafruit_pycamera import imageprocessing
-from adafruit_pycamera import PyCameraBase
-
+from adafruit_pycamera import PyCameraBase, imageprocessing
 
 blend_50_50 = bitmapfilter.blend_precompute(imageprocessing.alphablend_maker(0.5))
 screen = bitmapfilter.blend_precompute(imageprocessing.screen_func)

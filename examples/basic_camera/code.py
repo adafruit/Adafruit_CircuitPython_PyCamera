@@ -4,6 +4,7 @@
 """simple point-and-shoot camera example. No bells! Zero whistles!"""
 
 import time
+
 import adafruit_pycamera  # pylint: disable=import-error
 
 pycam = adafruit_pycamera.PyCamera()

@@ -12,11 +12,13 @@ Press left or right to move by +- 1 image.
 Otherwise, images cycle every DISPLAY_INTERVAL milliseconds (default 8000 = 8 seconds)
 """
 
-import time
 import os
+import time
+
 import displayio
+from adafruit_ticks import ticks_add, ticks_diff, ticks_less, ticks_ms
 from jpegio import JpegDecoder
-from adafruit_ticks import ticks_less, ticks_ms, ticks_add, ticks_diff
+
 from adafruit_pycamera import PyCameraBase
 
 DISPLAY_INTERVAL = 8000  # milliseconds

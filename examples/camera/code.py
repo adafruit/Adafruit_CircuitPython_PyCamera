@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Unlicense
 
 import time
+
 import bitmaptools
 import displayio
 import gifio
