@@ -7,7 +7,7 @@
 import time
 import traceback
 
-import adafruit_pycamera  # pylint: disable=import-error
+import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example

@@ -142,7 +142,7 @@ while True:
                 continue
             i = 0
             ft = []
-            pycam._mode_label.text = "RECORDING"  # pylint: disable=protected-access
+            pycam._mode_label.text = "RECORDING"
 
             pycam.display.refresh()
             with gifio.GifWriter(
@@ -162,7 +162,7 @@ while True:
                     ft.append(1 / (t1 - t0))
                     print(end=".")
                     t0 = t1
-            pycam._mode_label.text = "GIF"  # pylint: disable=protected-access
+            pycam._mode_label.text = "GIF"
             print(f"\nfinal size {f.tell()} for {i} frames")
             print(f"average framerate {i/(t1-t00)}fps")
             print(f"best {max(ft)} worst {min(ft)} std. deviation {np.std(ft)}")

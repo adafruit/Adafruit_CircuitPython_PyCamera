@@ -145,7 +145,7 @@ def main():
                 image_counter = (image_counter + 1) % len(all_images)
                 try:
                     load_resized_image(bitmap, filename)
-                except Exception as e:  # pylint: disable=broad-exception-caught
+                except Exception as e:
                     pycam.display_message(f"Failed to read\n{filename}", color=0xFF0000)
                     print(e)
                     deadline = ticks_add(now, 500)

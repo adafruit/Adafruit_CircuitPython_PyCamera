@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT
 """Library for the Adafruit PyCamera with OV5640 autofocus module"""
 
-# pylint: disable=too-many-lines
 import gc
 import os
 import struct
@@ -80,7 +79,7 @@ _NVM_TIMELAPSE_RATE = const(4)
 _NVM_TIMELAPSE_SUBMODE = const(5)
 
 
-class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
+class PyCameraBase:
     """Base class for PyCamera hardware"""
 
     """Wrapper class for the PyCamera hardware with lots of smarts"""
@@ -207,7 +206,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         b"\x29\x80\x05"  # _DISPON and Delay 5ms
     )
 
-    def __init__(self) -> None:  # pylint: disable=too-many-statements
+    def __init__(self) -> None:  # noqa: PLR0915 Too many statements
         displayio.release_displays()
         self._i2c = board.I2C()
         self._spi = board.SPI()
@@ -275,7 +274,7 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
             pin.switch_to_input()
             return Debouncer(make_expander_input(pin_no))
 
-        self.up = make_debounced_expander_pin(_AW_UP)  # pylint: disable=invalid-name
+        self.up = make_debounced_expander_pin(_AW_UP)
         self.left = make_debounced_expander_pin(_AW_LEFT)
         self.right = make_debounced_expander_pin(_AW_RIGHT)
         self.down = make_debounced_expander_pin(_AW_DOWN)
@@ -507,7 +506,7 @@ See Learn Guide."""
         """Read the camera autofocus status register"""
         return self.read_camera_register(_OV5640_CMD_FW_STATUS)
 
-    def _send_autofocus_command(self, command, msg):  # pylint: disable=unused-argument
+    def _send_autofocus_command(self, command, msg):
         self.write_camera_register(_OV5640_CMD_ACK, 0x01)  # clear command ack
         self.write_camera_register(_OV5640_CMD_MAIN, command)  # send command
         for _ in range(100):
@@ -882,7 +881,6 @@ See Learn Guide."""
 
     @overlay.setter
     def overlay(self, new_overlay_file: str) -> None:
-        # pylint: disable=import-outside-toplevel
         import adafruit_imageload
         import ulab.numpy as np
         from displayio import ColorConverter, Colorspace
@@ -899,7 +897,6 @@ See Learn Guide."""
         del arr
 
     def _init_jpeg_decoder(self):
-        # pylint: disable=import-outside-toplevel
         from jpegio import JpegDecoder
 
         """
@@ -919,7 +916,7 @@ See Learn Guide."""
             raise ValueError(
                 "Must set overlay before calling blit_overlay_into_last_capture"
             )
-        # pylint: disable=import-outside-toplevel
+
         from adafruit_bitmapsaver import save_pixels
         from displayio import Bitmap, ColorConverter, Colorspace
 
@@ -956,7 +953,7 @@ See Learn Guide."""
 
     def continuous_capture_start(self):
         """Switch the camera to continuous-capture mode"""
-        pass  # pylint: disable=unnecessary-pass
+        pass
 
     def capture_into_jpeg(self):
         """Captures an image and returns it in JPEG format.
@@ -998,7 +995,7 @@ See Learn Guide."""
         The default preview capture is 240x176, leaving 32 pixel rows at the top and bottom
         for status information.
         """
-        # pylint: disable=import-outside-toplevel
+
         from displayio import Bitmap
 
         if self.overlay_bmp is not None:
@@ -1148,6 +1145,6 @@ class PyCamera(PyCameraBase):
 
         try:
             self.mount_sd_card()
-        except Exception as exc:  # pylint: disable=broad-exception-caught
+        except Exception as exc:
             # No SD card inserted, it's OK
             print(exc)

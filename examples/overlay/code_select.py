@@ -11,7 +11,7 @@ import os
 import time
 import traceback
 
-import adafruit_pycamera  # pylint: disable=import-error
+import adafruit_pycamera
 
 MODE_POSITION = 0
 MODE_SCALE = 1
