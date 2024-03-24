@@ -2,11 +2,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with an overlay frame image. """
+"""simple point-and-shoot camera example, with an overlay frame image."""
 
 import time
 import traceback
-import adafruit_pycamera  # pylint: disable=import-error
+
+import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example

@@ -2,14 +2,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with overly selecting using select button.
+"""simple point-and-shoot camera example, with overly selecting using select button.
 
 Place all overlay files inside /sd/overlays/ directory.
 """
+
 import os
 import time
 import traceback
-import adafruit_pycamera  # pylint: disable=import-error
+
+import adafruit_pycamera
 
 MODE_POSITION = 0
 MODE_SCALE = 1
