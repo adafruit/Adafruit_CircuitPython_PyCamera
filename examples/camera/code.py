@@ -27,25 +27,35 @@ UTC_OFFSET = os.getenv("UTC_OFFSET")
 TZ = os.getenv("TZ")
 
 print(f"Connecting to {os.getenv('CIRCUITPY_WIFI_SSID')}")
-wifi.radio.connect(
-    os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
-)
-if wifi.radio.connected:
-    print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}!")
-    print("My IP address is", wifi.radio.ipv4_address)
-    pool = socketpool.SocketPool(wifi.radio)
+SSID = os.getenv("CIRCUITPY_WIFI_SSID")
+PASSWORD = os.getenv("CIRCUITPY_WIFI_PASSWORD")
 
-    if UTC_OFFSET is None:
-        requests = adafruit_requests.Session(pool, ssl.create_default_context())
-        response = requests.get("http://worldtimeapi.org/api/timezone/" + TZ)
-        response_as_json = response.json()
-        UTC_OFFSET = response_as_json["raw_offset"] + response_as_json["dst_offset"]
+if SSID and PASSWORD:
+    wifi.radio.connect(
+        os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
+    )
+    if wifi.radio.connected:
+        print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}!")
+        print("My IP address is", wifi.radio.ipv4_address)
+        pool = socketpool.SocketPool(wifi.radio)
 
-    ntp = adafruit_ntp.NTP(pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600)
+        if UTC_OFFSET is None:
+            requests = adafruit_requests.Session(pool, ssl.create_default_context())
+            response = requests.get("http://worldtimeapi.org/api/timezone/" + TZ)
+            response_as_json = response.json()
+            UTC_OFFSET = response_as_json["raw_offset"] + response_as_json["dst_offset"]
+            print(f"UTC_OFFSET: {UTC_OFFSET}")
 
-    rtc.RTC().datetime = ntp.datetime
+        ntp = adafruit_ntp.NTP(
+            pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600
+        )
+
+        print(f"ntp time: {ntp.datetime}")
+        rtc.RTC().datetime = ntp.datetime
+    else:
+        print("Wifi failed to connect. Time not set.")
 else:
-    print("Wifi failed to connect. Time not set.")
+    print("Wifi config not found in settintgs.toml. Time not set.")
 
 pycam = adafruit_pycamera.PyCamera()
 # pycam.live_preview_mode()
@@ -199,7 +209,7 @@ while True:
                     t0 = t1
             pycam._mode_label.text = "GIF"  # pylint: disable=protected-access
             print(f"\nfinal size {f.tell()} for {i} frames")
-            print(f"average framerate {i/(t1-t00)}fps")
+            print(f"average framerate {i / (t1 - t00)}fps")
             print(f"best {max(ft)} worst {min(ft)} std. deviation {np.std(ft)}")
             f.close()
             pycam.display.refresh()
