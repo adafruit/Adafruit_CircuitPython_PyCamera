@@ -81,9 +81,10 @@ _NVM_TIMELAPSE_SUBMODE = const(5)
 
 
 class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
-    """Base class for PyCamera hardware"""
+    """Base class for PyCamera hardware
 
-    """Wrapper class for the PyCamera hardware with lots of smarts"""
+    Wrapper class for the PyCamera hardware with lots of smarts
+    """
 
     _finalize_firmware_load = (
         0x3022,
@@ -253,9 +254,6 @@ class PyCameraBase:  # pylint: disable=too-many-instance-attributes,too-many-pub
         self.shutter_button.switch_to_input(Pull.UP)
         self.shutter = Button(self.shutter_button)
 
-        self._cam_reset = DigitalInOut(board.CAMERA_RESET)
-        self._cam_pwdn = DigitalInOut(board.CAMERA_PWDN)
-
         # AW9523 GPIO expander
         self._aw = adafruit_aw9523.AW9523(self._i2c, address=0x58)
         print("Found AW9523")
@@ -374,14 +372,6 @@ See Learn Guide."""
 
     def init_camera(self, init_autofocus=True) -> None:
         """Initialize the camera, by default including autofocus"""
-        print("reset camera")
-        self._cam_reset.switch_to_output(False)
-        self._cam_pwdn.switch_to_output(True)
-        time.sleep(0.01)
-        self._cam_pwdn.switch_to_output(False)
-        time.sleep(0.01)
-        self._cam_reset.switch_to_output(True)
-        time.sleep(0.01)
 
         print("Initializing camera")
         self.camera = espcamera.Camera(
@@ -390,6 +380,8 @@ See Learn Guide."""
             pixel_clock_pin=board.CAMERA_PCLK,
             vsync_pin=board.CAMERA_VSYNC,
             href_pin=board.CAMERA_HREF,
+            powerdown_pin=board.CAMERA_PWDN,
+            reset_pin=board.CAMERA_RESET,
             pixel_format=espcamera.PixelFormat.RGB565,
             frame_size=espcamera.FrameSize.HQVGA,
             i2c=board.I2C(),
@@ -455,13 +447,13 @@ See Learn Guide."""
 
     def read_camera_register(self, reg: int) -> int:
         """Read a 1-byte camera register"""
-        b = bytearray(2)
-        b[0] = reg >> 8
-        b[1] = reg & 0xFF
+        b_out = bytearray(2)
+        b_out[0] = reg >> 8
+        b_out[1] = reg & 0xFF
+        b_in = bytearray(1)
         with self._camera_device as i2c:
-            i2c.write(b)
-            i2c.readinto(b, end=1)
-        return b[0]
+            i2c.write_then_readinto(b_out, b_in)
+        return b_in[0]
 
     def autofocus_init_from_bitstream(self, firmware: bytes):
         """Initialize the autofocus engine from a bytestring"""
