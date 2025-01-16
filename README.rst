@@ -2,7 +2,7 @@ Introduction
 ============
 
 
-.. image:: https://readthedocs.org/projects/adafruit-circuitpython-pycamera/badge/?version=latest
+.. image:: https://readthedocs.org/projects/pycamera/badge/?version=latest
     :target: https://docs.circuitpython.org/projects/pycamera/en/latest/
     :alt: Documentation Status
 
