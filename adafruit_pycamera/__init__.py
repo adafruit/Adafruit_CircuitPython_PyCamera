@@ -946,6 +946,13 @@ See Learn Guide."""
         del cc565_swapped
         gc.collect()
 
+    @property
+    def last_saved_filename(self) -> str:
+        """
+        The filename of the last image saved.
+        """
+        return self._last_saved_image_filename
+
     def continuous_capture_start(self):
         """Switch the camera to continuous-capture mode"""
         pass  # pylint: disable=unnecessary-pass
