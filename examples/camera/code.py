@@ -2,18 +2,19 @@
 # SPDX-FileCopyrightText: 2023 Limor Fried for Adafruit Industries
 #
 # SPDX-License-Identifier: Unlicense
-import ssl
 import os
+import ssl
 import time
-import socketpool
-import adafruit_requests
-import rtc
+
 import adafruit_ntp
-import wifi
+import adafruit_requests
 import bitmaptools
 import displayio
 import gifio
+import rtc
+import socketpool
 import ulab.numpy as np
+import wifi
 
 import adafruit_pycamera
 
@@ -31,9 +32,7 @@ SSID = os.getenv("CIRCUITPY_WIFI_SSID")
 PASSWORD = os.getenv("CIRCUITPY_WIFI_PASSWORD")
 
 if SSID and PASSWORD:
-    wifi.radio.connect(
-        os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
-    )
+    wifi.radio.connect(os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD"))
     if wifi.radio.connected:
         print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}!")
         print("My IP address is", wifi.radio.ipv4_address)
@@ -46,9 +45,7 @@ if SSID and PASSWORD:
             UTC_OFFSET = response_as_json["raw_offset"] + response_as_json["dst_offset"]
             print(f"UTC_OFFSET: {UTC_OFFSET}")
 
-        ntp = adafruit_ntp.NTP(
-            pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600
-        )
+        ntp = adafruit_ntp.NTP(pool, server="pool.ntp.org", tz_offset=UTC_OFFSET // 3600)
 
         print(f"ntp time: {ntp.datetime}")
         rtc.RTC().datetime = ntp.datetime
@@ -103,13 +100,9 @@ while True:
         pycam.timelapse_submode_label.text = pycam.timelapse_submode_label.text
 
         # only in high power mode do we continuously preview
-        if (timelapse_remaining is None) or (
-            pycam.timelapse_submode_label.text == "HiPwr"
-        ):
+        if (timelapse_remaining is None) or (pycam.timelapse_submode_label.text == "HiPwr"):
             pycam.blit(pycam.continuous_capture())
-        if pycam.timelapse_submode_label.text == "LowPwr" and (
-            timelapse_remaining is not None
-        ):
+        if pycam.timelapse_submode_label.text == "LowPwr" and (timelapse_remaining is not None):
             pycam.display.brightness = 0.05
         else:
             pycam.display.brightness = 1
@@ -122,18 +115,16 @@ while True:
             try:
                 pycam.display_message("Snap!", color=0x0000FF)
                 pycam.capture_jpeg()
-            except TypeError as e:
+            except TypeError:
                 pycam.display_message("Failed", color=0xFF0000)
                 time.sleep(0.5)
-            except RuntimeError as e:
+            except RuntimeError:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
             pycam.live_preview_mode()
             pycam.display.refresh()
             pycam.blit(pycam.continuous_capture())
-            timelapse_timestamp = (
-                time.time() + pycam.timelapse_rates[pycam.timelapse_rate] + 1
-            )
+            timelapse_timestamp = time.time() + pycam.timelapse_rates[pycam.timelapse_rate] + 1
     else:
         pycam.blit(pycam.continuous_capture())
     # print("\t\t", capture_time, blit_time)
@@ -153,10 +144,10 @@ while True:
             try:
                 pycam.display_message("Snap!", color=0x0000FF)
                 pycam.capture_jpeg()
-            except TypeError as e:
+            except TypeError:
                 pycam.display_message("Failed", color=0xFF0000)
                 time.sleep(0.5)
-            except RuntimeError as e:
+            except RuntimeError:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
             pycam.live_preview_mode()
@@ -164,7 +155,7 @@ while True:
         if pycam.mode_text == "GBOY":
             try:
                 f = pycam.open_next_image("gif")
-            except RuntimeError as e:
+            except RuntimeError:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
                 continue
@@ -181,13 +172,13 @@ while True:
         if pycam.mode_text == "GIF":
             try:
                 f = pycam.open_next_image("gif")
-            except RuntimeError as e:
+            except RuntimeError:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
                 continue
             i = 0
             ft = []
-            pycam._mode_label.text = "RECORDING"  # pylint: disable=protected-access
+            pycam._mode_label.text = "RECORDING"
 
             pycam.display.refresh()
             with gifio.GifWriter(
@@ -207,7 +198,7 @@ while True:
                     ft.append(1 / (t1 - t0))
                     print(end=".")
                     t0 = t1
-            pycam._mode_label.text = "GIF"  # pylint: disable=protected-access
+            pycam._mode_label.text = "GIF"
             print(f"\nfinal size {f.tell()} for {i} frames")
             print(f"average framerate {i / (t1 - t00)}fps")
             print(f"best {max(ft)} worst {min(ft)} std. deviation {np.std(ft)}")
@@ -220,11 +211,11 @@ while True:
                 pycam.display_message("Snap!", color=0x0000FF)
                 pycam.capture_jpeg()
                 pycam.live_preview_mode()
-            except TypeError as e:
+            except TypeError:
                 pycam.display_message("Failed", color=0xFF0000)
                 time.sleep(0.5)
                 pycam.live_preview_mode()
-            except RuntimeError as e:
+            except RuntimeError:
                 pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                 time.sleep(0.5)
 

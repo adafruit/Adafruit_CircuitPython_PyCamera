@@ -2,11 +2,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with an overlay frame image. """
+"""simple point-and-shoot camera example, with an overlay frame image."""
 
 import time
 import traceback
-import adafruit_pycamera  # pylint: disable=import-error
+
+import adafruit_pycamera
 
 pycam = adafruit_pycamera.PyCamera()
 pycam.mode = 0  # only mode 0 (JPEG) will work in this example
@@ -47,7 +48,7 @@ while True:
             pycam.display_message("Failed", color=0xFF0000)
             time.sleep(0.5)
             pycam.live_preview_mode()
-        except RuntimeError as exception:
+        except RuntimeError:
             pycam.display_message("Error\nNo SD Card", color=0xFF0000)
             time.sleep(0.5)
 

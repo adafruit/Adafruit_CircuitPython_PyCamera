@@ -69,17 +69,13 @@ def lcd(request: Request) -> Response:
 def take_jpeg(request: Request) -> Response:
     pycam.camera.reconfigure(
         pixel_format=espcamera.PixelFormat.JPEG,
-        frame_size=pycam.resolution_to_frame_size[
-            pycam._resolution  # pylint: disable=protected-access
-        ],
+        frame_size=pycam.resolution_to_frame_size[pycam._resolution],
     )
     try:
         jpeg = pycam.camera.take(1)
         if jpeg is not None:
             return Response(request, bytes(jpeg), content_type="image/jpeg")
-        return Response(
-            request, "", content_type="text/plain", status=INTERNAL_SERVER_ERROR_500
-        )
+        return Response(request, "", content_type="text/plain", status=INTERNAL_SERVER_ERROR_500)
     finally:
         pycam.live_preview_mode()
 
@@ -109,13 +105,13 @@ def property_common(obj, request):
             try:
                 current_value = getattr(obj, propname, None)
                 return JSONResponse(request, current_value)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except Exception as exc:
                 return Response(request, {"error": str(exc)}, status=BAD_REQUEST_400)
         else:
             new_value = json.loads(value)
             setattr(obj, propname, new_value)
             return JSONResponse(request, {"status": "OK"})
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:
         return JSONResponse(request, {"error": str(exc)}, status=BAD_REQUEST_400)
 
 

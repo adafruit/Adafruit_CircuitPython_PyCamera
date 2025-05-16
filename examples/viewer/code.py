@@ -12,11 +12,13 @@ Press left or right to move by +- 1 image.
 Otherwise, images cycle every DISPLAY_INTERVAL milliseconds (default 8000 = 8 seconds)
 """
 
-import time
 import os
+import time
+
 import displayio
+from adafruit_ticks import ticks_add, ticks_diff, ticks_less, ticks_ms
 from jpegio import JpegDecoder
-from adafruit_ticks import ticks_less, ticks_ms, ticks_add, ticks_diff
+
 from adafruit_pycamera import PyCameraBase
 
 DISPLAY_INTERVAL = 8000  # milliseconds
@@ -83,9 +85,7 @@ def mount_sd():
         pycam.display_message("SD Card\nFailed!", color=0xFF0000)
         time.sleep(0.5)
     all_images = [
-        f"/sd/{filename}"
-        for filename in os.listdir("/sd")
-        if filename.lower().endswith(".jpg")
+        f"/sd/{filename}" for filename in os.listdir("/sd") if filename.lower().endswith(".jpg")
     ]
     pycam.display_message(f"Found {len(all_images)}\nimages", color=0xFFFFFF)
     time.sleep(0.5)
@@ -143,7 +143,7 @@ def main():
                 image_counter = (image_counter + 1) % len(all_images)
                 try:
                     load_resized_image(bitmap, filename)
-                except Exception as e:  # pylint: disable=broad-exception-caught
+                except Exception as e:
                     pycam.display_message(f"Failed to read\n{filename}", color=0xFF0000)
                     print(e)
                     deadline = ticks_add(now, 500)

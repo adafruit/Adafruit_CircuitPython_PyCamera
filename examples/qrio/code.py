@@ -14,8 +14,8 @@ import qrio
 from adafruit_pycamera import PyCamera
 
 pycam = PyCamera()
-pycam._mode_label.text = "QR SCAN"  # pylint: disable=protected-access
-pycam._res_label.text = ""  # pylint: disable=protected-access
+pycam._mode_label.text = "QR SCAN"
+pycam._res_label.text = ""
 pycam.effect = 0
 pycam.camera.hmirror = False
 pycam.display.refresh()
