@@ -51,8 +51,7 @@ def base(request):
         request,
         body,
         headers={
-            "Content-Type": "multipart/x-mixed-replace; boundary=%s"
-            % BOUNDARY.decode("ascii")
+            "Content-Type": "multipart/x-mixed-replace; boundary=%s" % BOUNDARY.decode("ascii")
         },
     )
 

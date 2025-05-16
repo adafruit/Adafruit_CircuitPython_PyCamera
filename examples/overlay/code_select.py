@@ -2,14 +2,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example, with overly selecting using select button.
+"""simple point-and-shoot camera example, with overly selecting using select button.
 
 Place all overlay files inside /sd/overlays/ directory.
 """
+
 import os
 import time
 import traceback
-import adafruit_pycamera  # pylint: disable=import-error
+
+import adafruit_pycamera
 
 MODE_POSITION = 0
 MODE_SCALE = 1
@@ -57,19 +59,13 @@ while True:
 
     if CURRENT_MODE == MODE_POSITION:
         if not pycam.down.value:
-            pycam.overlay_position[1] += 1 * (
-                int(pycam.down.current_duration / 0.3) + 1
-            )
+            pycam.overlay_position[1] += 1 * (int(pycam.down.current_duration / 0.3) + 1)
         if not pycam.up.value:
             pycam.overlay_position[1] -= 1 * (int(pycam.up.current_duration / 0.3) + 1)
         if not pycam.left.value:
-            pycam.overlay_position[0] -= 1 * (
-                int(pycam.left.current_duration / 0.3) + 1
-            )
+            pycam.overlay_position[0] -= 1 * (int(pycam.left.current_duration / 0.3) + 1)
         if not pycam.right.value:
-            pycam.overlay_position[0] += 1 * (
-                int(pycam.right.current_duration / 0.3) + 1
-            )
+            pycam.overlay_position[0] += 1 * (int(pycam.right.current_duration / 0.3) + 1)
     if CURRENT_MODE == MODE_SCALE:
         if pycam.down.fell:
             int_scale -= 10
@@ -98,7 +94,7 @@ while True:
             pycam.display_message("Failed", color=0xFF0000)
             time.sleep(0.5)
             pycam.live_preview_mode()
-        except RuntimeError as exception:
+        except RuntimeError:
             pycam.display_message("Error\nNo SD Card", color=0xFF0000)
             time.sleep(0.5)
 

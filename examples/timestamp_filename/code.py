@@ -1,18 +1,20 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 Tim Cocks for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-""" simple point-and-shoot camera example. With NTP and internal RTC to
- add timestamp to photo filenames. Must install adafruit_ntp library!
- Example code assumes WIFI credentials are properly setup and web workflow
- enabled in settings.toml. If not, you'll need to add code to manually connect
- to your network."""
+"""simple point-and-shoot camera example. With NTP and internal RTC to
+add timestamp to photo filenames. Must install adafruit_ntp library!
+Example code assumes WIFI credentials are properly setup and web workflow
+enabled in settings.toml. If not, you'll need to add code to manually connect
+to your network."""
 
 import time
-import wifi
-import socketpool
-import rtc
+
 import adafruit_ntp
-import adafruit_pycamera  # pylint: disable=import-error
+import rtc
+import socketpool
+import wifi
+
+import adafruit_pycamera
 
 pool = socketpool.SocketPool(wifi.radio)
 ntp = adafruit_ntp.NTP(pool, tz_offset=0)
@@ -46,21 +48,14 @@ while True:
         pycam.tone(1600, 0.05)
         try:
             pycam.display_message("snap", color=0x00DD00)
-            timestamp = "img_{}-{}-{}_{:02}-{:02}-{:02}_".format(
-                time.localtime().tm_year,
-                time.localtime().tm_mon,
-                time.localtime().tm_mday,
-                time.localtime().tm_hour,
-                time.localtime().tm_min,
-                time.localtime().tm_sec,
-            )
+            timestamp = f"img_{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}_{time.localtime().tm_hour:02}-{time.localtime().tm_min:02}-{time.localtime().tm_sec:02}_"  # noqa: E501
             pycam.capture_jpeg(filename_prefix=timestamp)
             pycam.live_preview_mode()
-        except TypeError as exception:
+        except TypeError:
             pycam.display_message("Failed", color=0xFF0000)
             time.sleep(0.5)
             pycam.live_preview_mode()
-        except RuntimeError as exception:
+        except RuntimeError:
             pycam.display_message("Error\nNo SD Card", color=0xFF0000)
             time.sleep(0.5)
 
