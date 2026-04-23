@@ -383,13 +383,9 @@ See Learn Guide."""
         )
 
         print(
-            "Found camera %s (%d x %d) at I2C address %02x"
-            % (
-                self.camera.sensor_name,
-                self.camera.width,
-                self.camera.height,
-                self.camera.address,
-            )
+            f"Found camera {self.camera.sensor_name}"
+            + f" ({self.camera.width:d} x {self.camera.height:d})"
+            + f" at I2C address {self.camera.address:02x}"
         )
 
         self._camera_device = I2CDevice(self._i2c, self.camera.address)
@@ -639,9 +635,9 @@ See Learn Guide."""
         setting = (setting + len(self.timelapse_rates)) % len(self.timelapse_rates)
         self._timelapse_rate = setting
         if self.timelapse_rates[setting] < 60:
-            self.timelapse_rate_label.text = "%d S" % self.timelapse_rates[setting]
+            self.timelapse_rate_label.text = f"{self.timelapse_rates[setting]:d} S"
         else:
-            self.timelapse_rate_label.text = "%d M" % (self.timelapse_rates[setting] / 60)
+            self.timelapse_rate_label.text = f"{self.timelapse_rates[setting] / 60:d} M"
         microcontroller.nvm[_NVM_TIMELAPSE_RATE] = setting
         self.display.refresh()
 
@@ -827,7 +823,7 @@ See Learn Guide."""
         jpeg = self.camera.take(1)
         if jpeg is not None:
             print(f"Captured {len(jpeg)} bytes of jpeg data")
-            print("Resolution %d x %d" % (self.camera.width, self.camera.height))
+            print(f"Resolution {self.camera.width:d} x {self.camera.height:d}")
 
             with self.open_next_image(filename_prefix=filename_prefix) as dest:
                 chunksize = 16384
@@ -943,7 +939,7 @@ See Learn Guide."""
         jpeg = self.camera.take(1)
         if jpeg is not None:
             print(f"Captured {len(jpeg)} bytes of jpeg data")
-            print("Resolution %d x %d" % (self.camera.width, self.camera.height))
+            print(f"Resolution {self.camera.width:d} x {self.camera.height:d}")
         else:
             print("JPEG capture failed")
         return jpeg

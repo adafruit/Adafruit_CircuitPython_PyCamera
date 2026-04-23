@@ -50,9 +50,7 @@ def base(request):
     return ChunkedResponse(
         request,
         body,
-        headers={
-            "Content-Type": "multipart/x-mixed-replace; boundary=%s" % BOUNDARY.decode("ascii")
-        },
+        headers={"Content-Type": f"multipart/x-mixed-replace; boundary={BOUNDARY.decode('ascii')}"},
     )
 
 
