@@ -263,7 +263,7 @@ while True:
     if pycam.left.fell:
         print("LF")
         curr_setting = (curr_setting - 1 + len(settings)) % len(settings)
-        if pycam.mode_text != "LAPS" and settings[curr_setting] == "timelaps_rate":
+        if pycam.mode_text != "LAPS" and settings[curr_setting] == "timelapse_rate":
             curr_setting = (curr_setting + 1) % len(settings)
         print(settings[curr_setting])
         pycam.select_setting(settings[curr_setting])
